@@ -1,0 +1,92 @@
+{
+  "name": "stdynt",
+  "short_name": "stdynt",
+  "description": "Student budget tracker with daily rollover",
+  "start_url": "./#/today",
+  "display": "standalone",
+  "background_color": "#172d24",
+  "theme_color": "#172d24",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "./",
+  "scope": "./",
+  "lang": "en",
+  "screenshots": [
+    {
+      "src": "screenshots/today-narrow.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Today: what you can spend"
+    },
+    {
+      "src": "screenshots/today-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Today and history side by side"
+    }
+  ],
+  "categories": [
+    "finance",
+    "education"
+  ],
+  "shortcuts": [
+    {
+      "name": "Log expense",
+      "short_name": "Log",
+      "url": "./?log=1#/today",
+      "icons": [
+        {
+          "src": "icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "url": "./#/accounts",
+      "icons": [
+        {
+          "src": "icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Loans",
+      "url": "./#/loans",
+      "icons": [
+        {
+          "src": "icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
