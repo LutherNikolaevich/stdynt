@@ -521,6 +521,9 @@ button[aria-busy='true']:disabled {
   display: inline-flex;
   align-items: flex-start;
   align-self: flex-start;
+  /* Keep the figure above the negative-z liquid canvas in engines that
+     composite absolute canvases over in-flow text. */
+  position: relative;
   margin-top: auto;
   padding-top: 24px;
   max-width: 100%;
@@ -2177,6 +2180,44 @@ button[aria-busy='true']:disabled {
   margin: 4px 0 0 -8px;
 }
 
+.transfer-sides {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  flex-basis: 100%;
+}
+
+.swap-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 1px;
+  border: 1.5px solid var(--panel-line);
+  border-radius: 999px;
+  color: var(--text-2);
+  transition: rotate 0.4s var(--spring);
+}
+
+.swap-btn:active {
+  rotate: 90deg;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .swap-btn:hover {
+    color: var(--text);
+    border-color: var(--text);
+  }
+}
+
+.transfer-tail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
 .account-chips legend {
   margin-bottom: 8px;
 }
@@ -2464,6 +2505,11 @@ button[aria-busy='true']:disabled {
   gap: 18px;
   padding: 16px 16px calc(20px + var(--safe-b));
   min-width: 0;
+}
+
+/* add-forms moved into the sheet: drop the card margin, keep the sheet gap */
+.sheet .add-form {
+  margin-top: 0;
 }
 
 .sheet-head {
@@ -3117,6 +3163,7 @@ button[aria-busy='true']:disabled {
 
 .card-list li.is-editing,
 .card-list li.loan-row,
+.card-list li.goal-row,
 .cat-list li {
   flex-wrap: wrap;
 }
@@ -3295,7 +3342,8 @@ button[aria-busy='true']:disabled {
   accent-color: var(--text);
 }
 
-.loan-panel {
+.loan-panel,
+.goal-panel {
   flex-basis: 100%;
   margin-bottom: 4px;
   border-top: 1px dashed var(--panel-line);
@@ -3331,8 +3379,58 @@ button[aria-busy='true']:disabled {
 
 .loan-panel .row-edit + .row-edit,
 .loan-panel .row-edit + .loan-sub,
+.goal-panel .row-edit + .row-edit,
+.goal-panel .row-edit + .loan-sub,
 .pay-list + .row-edit {
   border-top: 1px dashed var(--panel-line);
+}
+
+.goal-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-basis: 100%;
+  margin: -4px 0 10px;
+}
+
+.goal-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--panel-line);
+  overflow: hidden;
+}
+
+.goal-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--sun);
+  transition: width 0.9s var(--ease-out);
+}
+
+.goal-pct {
+  font-family: var(--font-stamp);
+  font-stretch: var(--stamp-stretch);
+  font-weight: 700;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.goal-badge {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border: 1.5px solid var(--sun);
+  border-radius: 999px;
+  color: var(--sun);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.goal-panel .pay-list li {
+  padding: 6px 0;
 }
 
 .cat-move {
@@ -3348,49 +3446,6 @@ button[aria-busy='true']:disabled {
   padding-top: 16px;
   border-top: 1.5px solid var(--panel-line);
 }
-
-.add-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 48px;
-  margin-top: 16px;
-  padding-right: 20px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.9375rem;
-  color: var(--text);
-  touch-action: manipulation;
-}
-
-.add-dot {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 48px;
-  height: 48px;
-  border: 1.5px solid var(--text-2);
-  border-radius: 50%;
-  transition: background-color 0.2s ease, transform 0.4s var(--spring);
-}
-
-.add-row:active .add-dot {
-  background: rgb(245 240 230 / 0.1);
-  transform: scale(0.94);
-  transition-duration: 0.08s;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .add-row:hover .add-dot {
-    background: rgb(245 240 230 / 0.06);
-  }
-}
-
-.add-row:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
-}
-
 
 .confirm {
   margin: auto;
@@ -3760,8 +3815,16 @@ button[aria-busy='true']:disabled {
 }
 
 @media (max-width: 999px) {
-  .view-settings .rail {
+  .view-settings .bottom-nav {
     display: none;
+  }
+
+  .view-settings .fab {
+    bottom: calc(16px + var(--safe-b));
+  }
+
+  .app.view-settings {
+    padding-bottom: calc(104px + var(--safe-b));
   }
 }
 
@@ -3851,6 +3914,11 @@ button[aria-busy='true']:disabled {
     --nav-h: 48px;
   }
 
+  /* Keep today's number (bottom of the well) on screen at ~390px of height. */
+  .well {
+    min-height: 176px;
+  }
+
   /* Settings has no bottom nav, so there the header's Back link stays pinned. */
   .app:not(.view-settings) .topbar {
     position: static;
@@ -3912,6 +3980,7 @@ button[aria-busy='true']:disabled {
 @media (prefers-reduced-motion: no-preference) {
   .add-form,
   .loan-panel,
+  .goal-panel,
   .saved-note,
   .day-rows,
   #earlier-days:not([hidden]),

@@ -84,7 +84,7 @@ const cashDelta = (t) => {
   return 0;
 };
 
-export function computeBudget({ settings, expenses, income, transfers = [], todayStr }) {
+export function computeBudget({ settings, expenses, income, todayStr }) {
   const daily = Number(settings.dailyBudget) || 0;
   const hasDaily = daily > 0;
   const skipWeekends = settings.skipWeekends === true;
@@ -108,23 +108,15 @@ export function computeBudget({ settings, expenses, income, transfers = [], toda
     incBy.get(e.date).push(e);
   }
 
-  const movedBy = new Map();
-  for (const t of transfers) {
-    if (!t.date || t.date < start || t.date > todayStr) continue;
-    sumInto(movedBy, t.date, cashDelta(t));
-  }
-
   const dayRows = [];
   let carry = base;
   if (hasDaily) {
     for (let ds = start; ds < todayStr; ds = addDays(ds, 1)) {
       const spent = spentBy.get(ds) || 0;
-      const moved = movedBy.get(ds) || 0;
-      carry += dailyOn(ds) - spent + (earnedBy.get(ds) || 0) + moved;
+      carry += dailyOn(ds) - spent + (earnedBy.get(ds) || 0);
       dayRows.push({
         date: ds,
         spent,
-        moved,
         carried: carry,
         weekendOff: dailyOn(ds) === 0,
         income: incBy.get(ds) || [],
@@ -137,7 +129,6 @@ export function computeBudget({ settings, expenses, income, transfers = [], toda
   const dailyToday = dailyOn(todayStr);
   const spentToday = spentBy.get(todayStr) || 0;
   const earnedToday = earnedBy.get(todayStr) || 0;
-  const movedToday = movedBy.get(todayStr) || 0;
   const rolloverCarryover = hasDaily ? carry : 0;
   return {
     hasDaily,
@@ -146,9 +137,8 @@ export function computeBudget({ settings, expenses, income, transfers = [], toda
     dailyToday,
     spentToday,
     earnedToday,
-    movedToday,
     rolloverCarryover,
-    availableToday: hasDaily ? dailyToday + rolloverCarryover - spentToday + earnedToday + movedToday : 0,
+    availableToday: hasDaily ? dailyToday + rolloverCarryover - spentToday + earnedToday : 0,
     dayRows
   };
 }
