@@ -521,6 +521,9 @@ button[aria-busy='true']:disabled {
   display: inline-flex;
   align-items: flex-start;
   align-self: flex-start;
+  /* Keep the figure above the negative-z liquid canvas in engines that
+     composite absolute canvases over in-flow text. */
+  position: relative;
   margin-top: auto;
   padding-top: 24px;
   max-width: 100%;

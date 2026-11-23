@@ -3219,34 +3219,6 @@ export default function App() {
           )}
         </div>
 
-        {view === 'today' && backupDue && (
-          <div className="slip backup-slip">
-            <Download size={18} strokeWidth={2.25} aria-hidden="true" />
-            <div className="slip-body">
-              <p>
-                Time for your weekly backup.{' '}
-                <span className="slip-meta">
-                  {lastBackup ? `Last backup ${stampDate(lastBackup).toLowerCase().replace(/^0/, '')}.` : 'No backup yet.'}
-                </span>
-              </p>
-              <div className="slip-actions">
-                <button
-                  type="button"
-                  className="btn ink"
-                  onClick={exportJSON}
-                  disabled={!!fileBusy}
-                  aria-busy={fileBusy === 'backup'}
-                >
-                  {fileBusy === 'backup' ? 'Saving…' : 'Back up'}
-                </button>
-                <button type="button" className="btn outline" onClick={snoozeBackup}>
-                  Not this week
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className={`view-pane pane-${view}`} key={view}>
           {view === 'today' && (
             <>
@@ -4759,6 +4731,34 @@ export default function App() {
             </>
           )}
         </div>
+
+        {view === 'today' && backupDue && (
+          <div className="slip backup-slip">
+            <Download size={18} strokeWidth={2.25} aria-hidden="true" />
+            <div className="slip-body">
+              <p>
+                Time for your weekly backup.{' '}
+                <span className="slip-meta">
+                  {lastBackup ? `Last backup ${stampDate(lastBackup).toLowerCase().replace(/^0/, '')}.` : 'No backup yet.'}
+                </span>
+              </p>
+              <div className="slip-actions">
+                <button
+                  type="button"
+                  className="btn ink"
+                  onClick={exportJSON}
+                  disabled={!!fileBusy}
+                  aria-busy={fileBusy === 'backup'}
+                >
+                  {fileBusy === 'backup' ? 'Saving…' : 'Back up'}
+                </button>
+                <button type="button" className="btn outline" onClick={snoozeBackup}>
+                  Not this week
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {}
