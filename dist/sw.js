@@ -1,13 +1,13 @@
 // Offline-first: every file of a build is stored at install, then served from that copy.
 // The network is only used to fetch the next build, never to open the app.
 // VERSION and PRECACHE are filled in at build time (see precacheManifest in vite.config.js).
-const VERSION = "6fc6ee974108";
+const VERSION = "fa9ac51585a9";
 const PRECACHE = [
   "./assets/bricolage-grotesque-latin-ext-wdth-normal-DoS1gVTC.woff2",
   "./assets/bricolage-grotesque-latin-wdth-normal-Dtb2a5nO.woff2",
   "./assets/bricolage-grotesque-vietnamese-wdth-normal-BKE08zty.woff2",
-  "./assets/index-BN2zOUfj.js",
   "./assets/index-DJtTJMaa.css",
+  "./assets/index-DWCfXrxY.js",
   "./icon-192-maskable.png",
   "./icon-192.png",
   "./icon-512-maskable.png",
