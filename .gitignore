@@ -12,6 +12,7 @@ docs/
 .playwright-mcp/
 .impeccable/
 graphify-out/
+.gitignore
 
 npm-debug.log*
 *.log
