@@ -18,7 +18,6 @@ import {
   Search,
   Wallet,
   ArrowRight,
-  ArrowRightLeft,
   Smartphone,
   RefreshCw,
   SlidersHorizontal
@@ -1097,7 +1096,6 @@ export default function App() {
   useEffect(() => {
     if (view !== 'settings') lastMoneyViewRef.current = view;
     setFabCompact(false);
-    setAddForm(null);
   }, [view]);
 
   useEffect(() => {
@@ -1952,7 +1950,6 @@ export default function App() {
       }
     });
     e.target.reset();
-    closeAddForm();
   };
 
   const saveSub = (e, sub) => {
@@ -2139,7 +2136,6 @@ export default function App() {
     e.target.reset();
     setLoanKind('i_owe');
     setLoanOrigin('new');
-    closeAddForm();
   };
 
   // Reads the plan inputs. null means the loan has no plan; undefined means a field was rejected.
@@ -2374,7 +2370,6 @@ export default function App() {
     });
     form.reset();
     resetAddAccountDraft('bank', nextAccounts);
-    closeAddForm();
   };
 
   const saveAccount = (e, acc) => {
@@ -2467,7 +2462,6 @@ export default function App() {
       }
     });
     form.reset();
-    closeTransferForm();
   };
 
   const saveTransfer = (e, transfer) => {
@@ -2517,7 +2511,6 @@ export default function App() {
       }
     });
     e.target.reset();
-    closeGoalForm();
   };
 
   const saveGoal = (e, goal) => {
@@ -2834,13 +2827,9 @@ export default function App() {
 
   const [ask, setAsk] = useState(null);
   const askRef = useRef(null);
-  const [addForm, setAddForm] = useState(null);
   const [loanKind, setLoanKind] = useState('i_owe');
   const [loanOrigin, setLoanOrigin] = useState('new');
   const [subOrigin, setSubOrigin] = useState('new');
-  const addBtnRef = useRef(null);
-  const transferBtnRef = useRef(null);
-  const goalBtnRef = useRef(null);
   const [transfersAll, setTransfersAll] = useState(false);
   useEffect(() => {
     if (ask && askRef.current && !askRef.current.open) askRef.current.showModal();
@@ -3045,25 +3034,9 @@ export default function App() {
         : parseDate(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
     return sheetTime ? `${day}, ${sheetTime}` : day;
   })();
-  const subFormOpen = addForm === 'subs' || data.subscriptions.length === 0;
-  const loanFormOpen = addForm === 'loans' || data.debts.length === 0;
-  const accountFormOpen = addForm === 'accounts' || accounts.length === 0;
   const TRANSFERS_SHOWN = 5;
   const accountSplit =
     accounts.length > 2 && accounts.some((a) => a.type === 'ewallet') && accounts.some((a) => a.type !== 'ewallet');
-  const closeAddForm = () => {
-    setAddForm(null);
-    requestAnimationFrame(() => addBtnRef.current?.focus());
-  };
-  const closeGoalForm = () => {
-    setAddForm(null);
-    requestAnimationFrame(() => goalBtnRef.current?.focus());
-  };
-  const closeTransferForm = () => {
-    setAddForm(null);
-    requestAnimationFrame(() => transferBtnRef.current?.focus());
-  };
-
   return (
     <div className={`app view-${view}`}>
       <header className={`topbar ${scrolled ? 'is-scrolled' : ''}`}>
@@ -3757,8 +3730,7 @@ export default function App() {
                   })}
                 </ul>
               )}
-              {subFormOpen ? (
-                <form onSubmit={handleAddSub} className="add-form">
+              <form onSubmit={handleAddSub} className="add-form">
                   <fieldset className="radio-seg grow-full">
                     <legend className="sr-only">New or existing</legend>
                     <label>
@@ -3772,7 +3744,7 @@ export default function App() {
                   </fieldset>
                   <label className="field grow">
                     <span>Service</span>
-                    <input name="name" type="text" placeholder="Spotify Student" maxLength={NAME_MAX} required autoFocus={addForm === 'subs'} onInput={clearValidity} />
+                    <input name="name" type="text" placeholder="Spotify Student" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
                   </label>
                   <label className="field amount">
                     <span>Per month</span>
@@ -3784,25 +3756,12 @@ export default function App() {
                   </label>
                   {accountField(defaultAccountId, 'Paid from')}
                   <button type="submit" className="btn ink">Add</button>
-                  {addForm === 'subs' && data.subscriptions.length > 0 && (
-                    <button type="button" className="btn outline" onClick={closeAddForm}>
-                      Cancel
-                    </button>
-                  )}
                 </form>
-              ) : (
-                <button ref={addBtnRef} type="button" className="add-row" onClick={() => setAddForm('subs')}>
-                  <span className="add-dot" aria-hidden="true"><Plus size={20} strokeWidth={2.5} /></span>
-                  Add subscription
-                </button>
-              )}
-              {subFormOpen && (
 <p className="hint sub-mode">
                 {subOrigin === 'existing'
                   ? 'Nothing is logged today. It is logged from its next billing day.'
                   : "Adding one logs today's payment right away. After that it is logged on its billing day. Without a billing day it only counts toward the month."}
               </p>
-)}
             </section>
           )}
 
@@ -4086,8 +4045,7 @@ export default function App() {
                   })}
                 </ul>
               )}
-              {loanFormOpen ? (
-                <form onSubmit={handleAddDebt} className="add-form loans-form">
+              <form onSubmit={handleAddDebt} className="add-form loans-form">
                   <fieldset className="radio-seg grow-full">
                     <legend className="sr-only">Direction</legend>
                     <label>
@@ -4116,7 +4074,7 @@ export default function App() {
                   </fieldset>
                   <label className="field grow">
                     <span>{loanKind === 'installment' ? 'What' : 'Who'}</span>
-                    <input name="person" type="text" placeholder={loanKind === 'installment' ? 'Phone' : 'Maya'} maxLength={NAME_MAX} required autoFocus={addForm === 'loans'} onInput={clearValidity} />
+                    <input name="person" type="text" placeholder={loanKind === 'installment' ? 'Phone' : 'Maya'} maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
                   </label>
                   <label className="field amount">
                     <span>{loanKind === 'installment' ? 'Total' : 'Amount'}</span>
@@ -4153,18 +4111,7 @@ export default function App() {
                     </p>
                   )}
                   <button type="submit" className="btn ink">Add</button>
-                  {addForm === 'loans' && data.debts.length > 0 && (
-                    <button type="button" className="btn outline" onClick={closeAddForm}>
-                      Cancel
-                    </button>
-                  )}
                 </form>
-              ) : (
-                <button ref={addBtnRef} type="button" className="add-row" onClick={() => setAddForm('loans')}>
-                  <span className="add-dot" aria-hidden="true"><Plus size={20} strokeWidth={2.5} /></span>
-                  Add loan
-                </button>
-              )}
             </section>
           )}
 
@@ -4302,8 +4249,7 @@ export default function App() {
                   })}
                 </ul>
               )}
-              {accountFormOpen ? (
-                <form onSubmit={handleAddAccount} className="add-form">
+              <form onSubmit={handleAddAccount} className="add-form">
                   <fieldset className="radio-seg grow-full">
                     <legend className="sr-only">Kind of account</legend>
                     {ACCOUNT_TYPES.map(([value, label]) => (
@@ -4324,7 +4270,7 @@ export default function App() {
                     <select
                       name="preset"
                       value={addAccountPreset}
-                      autoFocus={addForm === 'accounts'}
+                      autoFocus
                       onChange={(e) => {
                         e.currentTarget.setCustomValidity('');
                         setAddAccountPreset(e.currentTarget.value);
@@ -4357,26 +4303,7 @@ export default function App() {
                     <input name="balance" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" onInput={clearValidity} />
                   </label>
                   <button type="submit" className="btn ink">Add</button>
-                  {addForm === 'accounts' && hasAccounts && (
-                    <button type="button" className="btn outline" onClick={closeAddForm}>
-                      Cancel
-                    </button>
-                  )}
                 </form>
-              ) : (
-                <button
-                  ref={addBtnRef}
-                  type="button"
-                  className="add-row"
-                  onClick={() => {
-                    resetAddAccountDraft('bank');
-                    setAddForm('accounts');
-                  }}
-                >
-                  <span className="add-dot" aria-hidden="true"><Plus size={20} strokeWidth={2.5} /></span>
-                  Add account
-                </button>
-              )}
 
               <div className="transfers">
                 <h2>Transfers</h2>
@@ -4447,20 +4374,10 @@ export default function App() {
                         {transfersAll ? 'Show fewer' : `Show all ${transfersByWhen.length} transfers`}
                       </button>
                     )}
-                    {addForm === 'transfer' ? (
-                      <form onSubmit={handleTransfer} onChange={clearTransferValidity} className="add-form transfer-form">
+                    <form onSubmit={handleTransfer} onChange={clearTransferValidity} className="add-form transfer-form">
                         {transferFields(transferDefaults)}
                         <button type="submit" className="btn ink">Transfer</button>
-                        <button type="button" className="btn outline" onClick={closeTransferForm}>
-                          Cancel
-                        </button>
                       </form>
-                    ) : (
-                      <button ref={transferBtnRef} type="button" className="add-row" onClick={() => setAddForm('transfer')}>
-                        <span className="add-dot" aria-hidden="true"><ArrowRightLeft size={18} strokeWidth={2.5} /></span>
-                        Transfer
-                      </button>
-                    )}
                                       </>
                 )}
               </div>
@@ -4590,8 +4507,7 @@ export default function App() {
                     })}
                   </ul>
                 )}
-                {addForm === 'goal' ? (
-                  <form onSubmit={handleAddGoal} className="add-form">
+                <form onSubmit={handleAddGoal} className="add-form">
                     <label className="field grow">
                       <span>Goal</span>
                       <input name="name" type="text" placeholder="Laptop" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
@@ -4601,16 +4517,7 @@ export default function App() {
                       <input name="target" type="text" inputMode="decimal" placeholder={zeroDecimal ? '20000' : '800.00'} autoComplete="off" required onInput={clearValidity} />
                     </label>
                     <button type="submit" className="btn ink">Add</button>
-                    <button type="button" className="btn outline" onClick={closeGoalForm}>
-                      Cancel
-                    </button>
                   </form>
-                ) : (
-                  <button ref={goalBtnRef} type="button" className="add-row" onClick={() => setAddForm('goal')}>
-                    <span className="add-dot" aria-hidden="true"><Plus size={20} strokeWidth={2.5} /></span>
-                    Add savings goal
-                  </button>
-                )}
                 {data.goals.length > 0 && (
                   <p className="hint">
                     Money set aside leaves the account you take it from, but it is not spending, so your daily number
