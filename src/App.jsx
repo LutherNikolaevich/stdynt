@@ -2943,13 +2943,22 @@ export default function App() {
       }
     });
 
-  const isNeg = availableToday < 0;
-  const formattedTodayAbs = formatNumber(Math.abs(availableToday), sym);
+  const noBudget = !hasDaily && monthlyBudget <= 0;
+  const fallbackIncome = incomeMonthly - spentMonthlyExpenses + movedMonthly;
+  const showWell = hasDaily || (noBudget && incomeMonthly > 0);
+  const wellAvailable = hasDaily ? availableToday : fallbackIncome;
+  const isNeg = wellAvailable < 0;
+  const formattedTodayAbs = formatNumber(Math.abs(wellAvailable), sym);
   const mathCellCount = 3 + (earnedToday > 0 ? 1 : 0) + (movedToday !== 0 ? 1 : 0);
   const mathColumnsClass = ['', '', '', '', 'four', 'five'][mathCellCount];
   const wellPool = availableToday + spentToday;
-  const wellLevel =
-    hasDaily && availableToday > 0 && wellPool > 0 ? Math.min(1, availableToday / wellPool).toFixed(4) : 0;
+  const wellLevel = hasDaily
+    ? availableToday > 0 && wellPool > 0
+      ? Math.min(1, availableToday / wellPool).toFixed(4)
+      : 0
+    : fallbackIncome > 0
+      ? 1
+      : 0;
   const stampDigitsClass =
     formattedTodayAbs.length > 9 ? 'digits-xl' : formattedTodayAbs.length > 6 ? 'digits-lg' : '';
 
@@ -3207,13 +3216,13 @@ export default function App() {
                 <section className="card day-card" aria-labelledby="today-label">
                   {}
                   <div className="today">
-                    <div className={`well ${hasDaily && isNeg ? 'debt' : ''}`} style={{ '--level': wellLevel }}>
-                    {hasDaily && <LiquidWell level={Number(wellLevel)} />}
+                    <div className={`well ${showWell && isNeg ? 'debt' : ''}`} style={{ '--level': wellLevel }}>
+                    {showWell && <LiquidWell level={Number(wellLevel)} />}
                     <h1 id="today-label" className="today-label">
-                      {!hasDaily ? 'Set your daily budget' : isNeg ? 'Over today by' : 'You can spend today'}
+                      {!showWell ? 'Set your daily budget' : isNeg ? 'Over today by' : 'You can spend today'}
                     </h1>
 
-                    {!hasDaily ? (
+                    {!showWell ? (
                       <div className="budget-setup-box">
                         <p>
                           {!hasBudgetSet
@@ -3240,15 +3249,15 @@ export default function App() {
                           key={stampKey}
                           className={`stamp ${isNeg ? 'debt' : ''} ${stampDigitsClass} ${stampKey ? 'pressed' : ''}`}
                         >
-                          <span className="sr-only">{fmt(Math.abs(availableToday))}</span>
+                          <span className="sr-only">{fmt(Math.abs(wellAvailable))}</span>
                           <span className="stamp-sym" aria-hidden="true">{sym}</span>
-                          <StampFigure value={availableToday} sym={sym} />
+                          <StampFigure value={wellAvailable} sym={sym} />
                         </div>
                         <span className="date-stamp" aria-hidden="true">{stampDate(todayStr)}</span>
                       </>
                     )}
                     </div>
-                    {hasDaily && (
+                    {hasDaily ? (
                         <dl className={`math ${mathColumnsClass}`}>
                           <div>
                             <dt>{weekendOff ? 'Weekend' : 'Daily'}</dt>
@@ -3273,6 +3282,13 @@ export default function App() {
                           <div>
                             <dt>Spent</dt>
                             <dd><Money value={spentToday} sym={sym} /></dd>
+                          </div>
+                        </dl>
+                    ) : showWell && (
+                        <dl className="math">
+                          <div>
+                            <dt>Income</dt>
+                            <dd><Money value={incomeMonthly} sym={sym} /></dd>
                           </div>
                         </dl>
                     )}
