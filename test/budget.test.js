@@ -104,3 +104,18 @@ test('monthly pending subscriptions use cash payments only', async () => {
   });
   assert.deepEqual(totals, { spent: 10, earned: 0, moved: 0, pending: 20 });
 });
+
+test('cash<->account transfers leave today and carry unchanged', () => {
+  const b = computeBudget({
+    settings, expenses: [], income: [], todayStr,
+    transfers: [
+      { fromId: null, toId: 'bank', amount: 20, date: todayStr },
+      { fromId: 'bank', toId: null, amount: 15, date: '2026-11-21' }
+    ]
+  });
+  assert.equal(b.availableToday, 100 + 300);
+  assert.equal(b.spentToday, 0);
+  assert.equal(b.earnedToday, 0);
+  assert.deepEqual(b.dayRows.map((r) => r.carried), [300, 200, 100]);
+  assert.ok(b.dayRows.every((r) => !('moved' in r)));
+});

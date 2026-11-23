@@ -1265,12 +1265,11 @@ export default function App() {
         settings: data.settings,
         expenses: data.expenses,
         income: data.income,
-        transfers: data.transfers,
         todayStr
       }),
-    [data.settings, data.expenses, data.income, data.transfers, todayStr]
+    [data.settings, data.expenses, data.income, todayStr]
   );
-  const { dailyToday, rolloverCarryover, availableToday, spentToday, earnedToday, movedToday } = budget;
+  const { dailyToday, rolloverCarryover, availableToday, spentToday, earnedToday } = budget;
   const startStr = budget.start;
   const rolloverBase = budget.base;
   const weekendOff = hasDaily && dailyToday === 0;
@@ -1283,8 +1282,7 @@ export default function App() {
   const dayRows = budget.dayRows.map((r) => {
     const items = [
       ...r.income.map((e) => `+${fmt(e.amount)} ${e.note || 'income'}`),
-      ...r.expenses.map((e) => e.note || e.category),
-      ...(r.moved === 0 ? [] : [r.moved < 0 ? `${fmt(-r.moved)} moved out of cash` : `${fmt(r.moved)} moved into cash`])
+      ...r.expenses.map((e) => e.note || e.category)
     ];
     return {
       date: r.date,
@@ -2701,7 +2699,6 @@ export default function App() {
           settings: cur,
           expenses: d.expenses,
           income: d.income,
-          transfers: d.transfers,
           todayStr
         });
         next.dailyRolloverStartDate = todayStr;
@@ -2949,7 +2946,7 @@ export default function App() {
   const wellAvailable = hasDaily ? availableToday : fallbackIncome;
   const isNeg = wellAvailable < 0;
   const formattedTodayAbs = formatNumber(Math.abs(wellAvailable), sym);
-  const mathCellCount = 3 + (earnedToday > 0 ? 1 : 0) + (movedToday !== 0 ? 1 : 0);
+  const mathCellCount = 3 + (earnedToday > 0 ? 1 : 0);
   const mathColumnsClass = ['', '', '', '', 'four', 'five'][mathCellCount];
   const wellPool = availableToday + spentToday;
   const wellLevel = showWell
@@ -3273,12 +3270,6 @@ export default function App() {
                             <div>
                               <dt>Income</dt>
                               <dd className="pos"><Money value={earnedToday} sym={sym} sign="+" /></dd>
-                            </div>
-                          )}
-                          {movedToday !== 0 && (
-                            <div>
-                              <dt>Moved</dt>
-                              <dd className={movedToday < 0 ? 'neg' : 'pos'}><Money value={movedToday} sym={sym} sign="both" /></dd>
                             </div>
                           )}
                           <div>
