@@ -18,7 +18,8 @@ import {
   Search,
   Wallet,
   ArrowRight,
-  ArrowRightLeft,
+  ArrowLeftRight,
+  Banknote,
   Smartphone,
   RefreshCw,
   SlidersHorizontal
@@ -365,6 +366,16 @@ const MONEY_VIEWS = [
 ];
 
 const VIEWS = [...MONEY_VIEWS.map((v) => v.id), 'settings'];
+const ADD_FORMS = {
+  subs: ['add-subs', 'Add subscription'],
+  loans: ['add-loans', 'Add loan'],
+  accounts: ['add-accounts', 'Add account']
+};
+const ADD_SHEET_LABELS = {
+  account: 'Add account',
+  transfer: 'Transfer money',
+  goal: 'New savings goal'
+};
 const readRoute = () => {
   const h = window.location.hash.replace(/^#\/?/, '');
   return VIEWS.includes(h) ? h : 'today';
@@ -852,6 +863,9 @@ export default function App() {
   const leavingRef = useRef(false);
   const [stampKey, setStampKey] = useState(0);
   const [sheetClosing, setSheetClosing] = useState(false);
+  const addSheetRef = useRef(null);
+  const [addSheetClosing, setAddSheetClosing] = useState(false);
+  const [addSheetKind, setAddSheetKind] = useState('account');
   const [editing, setEditing] = useState(null);
   const [sheetKind, setSheetKind] = useState('expense');
   const [notice, setNotice] = useState(
@@ -1066,7 +1080,10 @@ export default function App() {
       scrollMemoRef.current[cur] = window.scrollY;
       document.documentElement.dataset.navDir = VIEWS.indexOf(next) >= VIEWS.indexOf(cur) ? 'fwd' : 'back';
       const commit = () => {
-        flushSync(() => setView(next));
+        flushSync(() => {
+          setView(next);
+          setAddSheetKind('account');
+        });
         window.scrollTo({ top: next === 'settings' ? 0 : scrollMemoRef.current[next] || 0 });
       };
       if (document.startViewTransition && !prefersReducedMotion()) {
@@ -1097,7 +1114,6 @@ export default function App() {
   useEffect(() => {
     if (view !== 'settings') lastMoneyViewRef.current = view;
     setFabCompact(false);
-    setAddForm(null);
   }, [view]);
 
   useEffect(() => {
@@ -1165,7 +1181,7 @@ export default function App() {
         leaveSettings();
       } else if ((e.key === 'n' || e.key === 'N') && !e.shiftKey && viewRef.current !== 'settings') {
         e.preventDefault();
-        openSheet();
+        primaryAdd();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -1265,12 +1281,11 @@ export default function App() {
         settings: data.settings,
         expenses: data.expenses,
         income: data.income,
-        transfers: data.transfers,
         todayStr
       }),
-    [data.settings, data.expenses, data.income, data.transfers, todayStr]
+    [data.settings, data.expenses, data.income, todayStr]
   );
-  const { dailyToday, rolloverCarryover, availableToday, spentToday, earnedToday, movedToday } = budget;
+  const { dailyToday, rolloverCarryover, availableToday, spentToday, earnedToday } = budget;
   const startStr = budget.start;
   const rolloverBase = budget.base;
   const weekendOff = hasDaily && dailyToday === 0;
@@ -1283,8 +1298,7 @@ export default function App() {
   const dayRows = budget.dayRows.map((r) => {
     const items = [
       ...r.income.map((e) => `+${fmt(e.amount)} ${e.note || 'income'}`),
-      ...r.expenses.map((e) => e.note || e.category),
-      ...(r.moved === 0 ? [] : [r.moved < 0 ? `${fmt(-r.moved)} moved out of cash` : `${fmt(r.moved)} moved into cash`])
+      ...r.expenses.map((e) => e.note || e.category)
     ];
     return {
       date: r.date,
@@ -1519,6 +1533,9 @@ export default function App() {
       if (accountRow) {
         accountRow.scrollLeft = Math.max(0, pickedAccount.offsetLeft - (accountRow.clientWidth - pickedAccount.offsetWidth) / 2);
       }
+      // A previous session can leave the recents row half-scrolled.
+      const recentRow = sheetRef.current?.querySelector('.recent-row');
+      if (recentRow) recentRow.scrollLeft = 0;
       amountInputRef.current?.focus();
     });
   };
@@ -1546,6 +1563,62 @@ export default function App() {
       setSheetClosing(false);
       if (typeof after === 'function') after();
     }, 240);
+  };
+
+  const openAddSheet = (kind = 'account') => {
+    setAddSheetKind(kind);
+    setAddSheetClosing(false);
+    addSheetRef.current?.showModal();
+    requestAnimationFrame(() => {
+      const form = addSheetRef.current?.querySelector('form');
+      form?.reset();
+      if (kind === 'account') {
+        setSubOrigin('new');
+        setLoanKind('i_owe');
+        setLoanOrigin('new');
+        resetAddAccountDraft('bank');
+      }
+      addSheetRef.current?.querySelector('input, select')?.focus();
+    });
+  };
+  const closeAddSheet = () => {
+    if (addSheetClosing) return;
+    setAddSheetClosing(true);
+    setTimeout(() => {
+      addSheetRef.current?.close();
+      if (addSheetRef.current) {
+        addSheetRef.current.style.transform = '';
+        addSheetRef.current.style.transition = '';
+      }
+      setAddSheetClosing(false);
+    }, 240);
+  };
+
+  const onAddSheetDragStart = (e) => {
+    if (!isPhoneLayout() || e.button > 0 || e.target.closest('button')) return;
+    dragRef.current = { y: e.clientY, t: performance.now(), dy: 0 };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    if (addSheetRef.current) addSheetRef.current.style.transition = 'none';
+  };
+  const onAddSheetDragMove = (e) => {
+    const drag = dragRef.current;
+    if (!drag || !addSheetRef.current) return;
+    drag.dy = Math.max(0, e.clientY - drag.y);
+    addSheetRef.current.style.transform = `translateY(${drag.dy}px)`;
+  };
+  const onAddSheetDragEnd = () => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    const el = addSheetRef.current;
+    if (!drag || !el) return;
+    const speed = drag.dy / Math.max(1, performance.now() - drag.t);
+    if (drag.dy > 110 || (drag.dy > 40 && speed > 0.6)) {
+      el.style.transition = '';
+      closeAddSheet();
+    } else {
+      el.style.transition = 'transform 0.4s var(--spring)';
+      el.style.transform = '';
+    }
   };
 
   const onSheetDragStart = (e) => {
@@ -1954,7 +2027,7 @@ export default function App() {
       }
     });
     e.target.reset();
-    closeAddForm();
+    closeAddSheet();
   };
 
   const saveSub = (e, sub) => {
@@ -2141,7 +2214,7 @@ export default function App() {
     e.target.reset();
     setLoanKind('i_owe');
     setLoanOrigin('new');
-    closeAddForm();
+    closeAddSheet();
   };
 
   // Reads the plan inputs. null means the loan has no plan; undefined means a field was rejected.
@@ -2376,7 +2449,7 @@ export default function App() {
     });
     form.reset();
     resetAddAccountDraft('bank', nextAccounts);
-    closeAddForm();
+    closeAddSheet();
   };
 
   const saveAccount = (e, acc) => {
@@ -2469,7 +2542,7 @@ export default function App() {
       }
     });
     form.reset();
-    closeTransferForm();
+    closeAddSheet();
   };
 
   const saveTransfer = (e, transfer) => {
@@ -2519,7 +2592,7 @@ export default function App() {
       }
     });
     e.target.reset();
-    closeGoalForm();
+    closeAddSheet();
   };
 
   const saveGoal = (e, goal) => {
@@ -2701,7 +2774,6 @@ export default function App() {
           settings: cur,
           expenses: d.expenses,
           income: d.income,
-          transfers: d.transfers,
           todayStr
         });
         next.dailyRolloverStartDate = todayStr;
@@ -2837,13 +2909,9 @@ export default function App() {
 
   const [ask, setAsk] = useState(null);
   const askRef = useRef(null);
-  const [addForm, setAddForm] = useState(null);
   const [loanKind, setLoanKind] = useState('i_owe');
   const [loanOrigin, setLoanOrigin] = useState('new');
   const [subOrigin, setSubOrigin] = useState('new');
-  const addBtnRef = useRef(null);
-  const transferBtnRef = useRef(null);
-  const goalBtnRef = useRef(null);
   const [transfersAll, setTransfersAll] = useState(false);
   useEffect(() => {
     if (ask && askRef.current && !askRef.current.open) askRef.current.showModal();
@@ -2949,7 +3017,7 @@ export default function App() {
   const wellAvailable = hasDaily ? availableToday : fallbackIncome;
   const isNeg = wellAvailable < 0;
   const formattedTodayAbs = formatNumber(Math.abs(wellAvailable), sym);
-  const mathCellCount = 3 + (earnedToday > 0 ? 1 : 0) + (movedToday !== 0 ? 1 : 0);
+  const mathCellCount = 3 + (earnedToday > 0 ? 1 : 0);
   const mathColumnsClass = ['', '', '', '', 'four', 'five'][mathCellCount];
   const wellPool = availableToday + spentToday;
   const wellLevel = showWell
@@ -3048,24 +3116,11 @@ export default function App() {
         : parseDate(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
     return sheetTime ? `${day}, ${sheetTime}` : day;
   })();
-  const subFormOpen = addForm === 'subs' || data.subscriptions.length === 0;
-  const loanFormOpen = addForm === 'loans' || data.debts.length === 0;
-  const accountFormOpen = addForm === 'accounts' || accounts.length === 0;
   const TRANSFERS_SHOWN = 5;
   const accountSplit =
     accounts.length > 2 && accounts.some((a) => a.type === 'ewallet') && accounts.some((a) => a.type !== 'ewallet');
-  const closeAddForm = () => {
-    setAddForm(null);
-    requestAnimationFrame(() => addBtnRef.current?.focus());
-  };
-  const closeGoalForm = () => {
-    setAddForm(null);
-    requestAnimationFrame(() => goalBtnRef.current?.focus());
-  };
-  const closeTransferForm = () => {
-    setAddForm(null);
-    requestAnimationFrame(() => transferBtnRef.current?.focus());
-  };
+  const fabTarget = ADD_FORMS[view];
+  const primaryAdd = () => (ADD_FORMS[viewRef.current] ? openAddSheet() : openSheet());
 
   return (
     <div className={`app view-${view}`}>
@@ -3106,12 +3161,12 @@ export default function App() {
       <div className="rail">
         <button
           className={`fab ${fabCompact ? 'compact' : ''}`}
-          onClick={() => openSheet()}
-          aria-label="Log expense"
+          onClick={primaryAdd}
+          aria-label={fabTarget ? fabTarget[1] : 'Log expense'}
           aria-keyshortcuts="N"
         >
           <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
-          <span className="fab-label">Log expense</span>
+          <span className="fab-label">{fabTarget ? fabTarget[1] : 'Log expense'}</span>
           <kbd className="nav-kbd" aria-hidden="true">N</kbd>
         </button>
         <nav className="bottom-nav" aria-label="Money">
@@ -3183,34 +3238,6 @@ export default function App() {
           )}
         </div>
 
-        {view === 'today' && backupDue && (
-          <div className="slip backup-slip">
-            <Download size={18} strokeWidth={2.25} aria-hidden="true" />
-            <div className="slip-body">
-              <p>
-                Time for your weekly backup.{' '}
-                <span className="slip-meta">
-                  {lastBackup ? `Last backup ${stampDate(lastBackup).toLowerCase().replace(/^0/, '')}.` : 'No backup yet.'}
-                </span>
-              </p>
-              <div className="slip-actions">
-                <button
-                  type="button"
-                  className="btn ink"
-                  onClick={exportJSON}
-                  disabled={!!fileBusy}
-                  aria-busy={fileBusy === 'backup'}
-                >
-                  {fileBusy === 'backup' ? 'Saving…' : 'Back up'}
-                </button>
-                <button type="button" className="btn outline" onClick={snoozeBackup}>
-                  Not this week
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className={`view-pane pane-${view}`} key={view}>
           {view === 'today' && (
             <>
@@ -3273,12 +3300,6 @@ export default function App() {
                             <div>
                               <dt>Income</dt>
                               <dd className="pos"><Money value={earnedToday} sym={sym} sign="+" /></dd>
-                            </div>
-                          )}
-                          {movedToday !== 0 && (
-                            <div>
-                              <dt>Moved</dt>
-                              <dd className={movedToday < 0 ? 'neg' : 'pos'}><Money value={movedToday} sym={sym} sign="both" /></dd>
                             </div>
                           )}
                           <div>
@@ -3766,52 +3787,6 @@ export default function App() {
                   })}
                 </ul>
               )}
-              {subFormOpen ? (
-                <form onSubmit={handleAddSub} className="add-form">
-                  <fieldset className="radio-seg grow-full">
-                    <legend className="sr-only">New or existing</legend>
-                    <label>
-                      <input type="radio" name="origin" value="new" checked={subOrigin === 'new'} onChange={() => setSubOrigin('new')} />
-                      <span>New</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="origin" value="existing" checked={subOrigin === 'existing'} onChange={() => setSubOrigin('existing')} />
-                      <span>Existing</span>
-                    </label>
-                  </fieldset>
-                  <label className="field grow">
-                    <span>Service</span>
-                    <input name="name" type="text" placeholder="Spotify Student" maxLength={NAME_MAX} required autoFocus={addForm === 'subs'} onInput={clearValidity} />
-                  </label>
-                  <label className="field amount">
-                    <span>Per month</span>
-                    <input name="cost" type="text" inputMode="decimal" placeholder="5.99" autoComplete="off" required onInput={clearValidity} />
-                  </label>
-                  <label className="field day">
-                    <span>Billing day</span>
-                    <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" placeholder="1 to 31" onInput={clearValidity} />
-                  </label>
-                  {accountField(defaultAccountId, 'Paid from')}
-                  <button type="submit" className="btn ink">Add</button>
-                  {addForm === 'subs' && data.subscriptions.length > 0 && (
-                    <button type="button" className="btn outline" onClick={closeAddForm}>
-                      Cancel
-                    </button>
-                  )}
-                </form>
-              ) : (
-                <button ref={addBtnRef} type="button" className="add-row" onClick={() => setAddForm('subs')}>
-                  <span className="add-dot" aria-hidden="true"><Plus size={20} strokeWidth={2.5} /></span>
-                  Add subscription
-                </button>
-              )}
-              {subFormOpen && (
-<p className="hint sub-mode">
-                {subOrigin === 'existing'
-                  ? 'Nothing is logged today. It is logged from its next billing day.'
-                  : "Adding one logs today's payment right away. After that it is logged on its billing day. Without a billing day it only counts toward the month."}
-              </p>
-)}
             </section>
           )}
 
@@ -4095,85 +4070,6 @@ export default function App() {
                   })}
                 </ul>
               )}
-              {loanFormOpen ? (
-                <form onSubmit={handleAddDebt} className="add-form loans-form">
-                  <fieldset className="radio-seg grow-full">
-                    <legend className="sr-only">Direction</legend>
-                    <label>
-                      <input type="radio" name="type" value="i_owe" checked={loanKind === 'i_owe'} onChange={() => setLoanKind('i_owe')} />
-                      <span>You owe</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="type" value="they_owe" checked={loanKind === 'they_owe'} onChange={() => setLoanKind('they_owe')} />
-                      <span>Owed to you</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="type" value="installment" checked={loanKind === 'installment'} onChange={() => setLoanKind('installment')} />
-                      <span>Installment</span>
-                    </label>
-                  </fieldset>
-                  <fieldset className="radio-seg grow-full">
-                    <legend className="sr-only">New or existing</legend>
-                    <label>
-                      <input type="radio" name="origin" value="new" checked={loanOrigin === 'new'} onChange={() => setLoanOrigin('new')} />
-                      <span>New</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="origin" value="existing" checked={loanOrigin === 'existing'} onChange={() => setLoanOrigin('existing')} />
-                      <span>Existing</span>
-                    </label>
-                  </fieldset>
-                  <label className="field grow">
-                    <span>{loanKind === 'installment' ? 'What' : 'Who'}</span>
-                    <input name="person" type="text" placeholder={loanKind === 'installment' ? 'Phone' : 'Maya'} maxLength={NAME_MAX} required autoFocus={addForm === 'loans'} onInput={clearValidity} />
-                  </label>
-                  <label className="field amount">
-                    <span>{loanKind === 'installment' ? 'Total' : 'Amount'}</span>
-                    <input name="amount" type="text" inputMode="decimal" placeholder={loanKind === 'installment' ? '6000' : '12.00'} autoComplete="off" required onInput={clearValidity} />
-                  </label>
-                  <label className="field">
-                    <span>Since</span>
-                    <input name="date" type="date" defaultValue={todayStr} max={todayStr} required />
-                  </label>
-                  {loanKind !== 'installment' && (
-                    <label className="field grow-full">
-                      <span>What for</span>
-                      <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
-                    </label>
-                  )}
-                  <PlanFields key={loanKind} todayStr={todayStr} optional={loanKind !== 'installment'} />
-                  {accountField(defaultAccountId, loanKind === 'installment' ? 'Paid from' : undefined)}
-                  {loanOrigin === 'existing' && (
-                    <label className="field amount">
-                      <span>Already paid</span>
-                      <input name="paidBefore" type="text" inputMode="decimal" placeholder="Optional" autoComplete="off" onInput={clearValidity} />
-                    </label>
-                  )}
-                  {loanKind === 'installment' && loanOrigin === 'new' && (
-                    <p className="hint grow-full">
-                      An installment adds nothing to today. Each payment you record counts as spending on the day you
-                      pay it.
-                    </p>
-                  )}
-                  {loanOrigin === 'existing' && (
-                    <p className="hint grow-full">
-                      Nothing is logged for what is already paid. Payments you record from now count on the day you pay
-                      them.
-                    </p>
-                  )}
-                  <button type="submit" className="btn ink">Add</button>
-                  {addForm === 'loans' && data.debts.length > 0 && (
-                    <button type="button" className="btn outline" onClick={closeAddForm}>
-                      Cancel
-                    </button>
-                  )}
-                </form>
-              ) : (
-                <button ref={addBtnRef} type="button" className="add-row" onClick={() => setAddForm('loans')}>
-                  <span className="add-dot" aria-hidden="true"><Plus size={20} strokeWidth={2.5} /></span>
-                  Add loan
-                </button>
-              )}
             </section>
           )}
 
@@ -4311,82 +4207,6 @@ export default function App() {
                   })}
                 </ul>
               )}
-              {accountFormOpen ? (
-                <form onSubmit={handleAddAccount} className="add-form">
-                  <fieldset className="radio-seg grow-full">
-                    <legend className="sr-only">Kind of account</legend>
-                    {ACCOUNT_TYPES.map(([value, label]) => (
-                      <label key={value}>
-                        <input
-                          type="radio"
-                          name="type"
-                          value={value}
-                          checked={addAccountType === value}
-                          onChange={() => resetAddAccountDraft(value)}
-                        />
-                        <span>{label}</span>
-                      </label>
-                    ))}
-                  </fieldset>
-                  <label className="field grow">
-                    <span>{accountTypeLabel(addAccountType)}</span>
-                    <select
-                      name="preset"
-                      value={addAccountPreset}
-                      autoFocus={addForm === 'accounts'}
-                      onChange={(e) => {
-                        e.currentTarget.setCustomValidity('');
-                        setAddAccountPreset(e.currentTarget.value);
-                      }}
-                    >
-                      {(ACCOUNT_PRESETS[addAccountType] || ACCOUNT_PRESETS.bank).map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                      <option value={CUSTOM_PRESET}>Custom</option>
-                    </select>
-                  </label>
-                  {addAccountPreset === CUSTOM_PRESET && (
-                    <label className="field grow">
-                      <span>Custom name</span>
-                      <input
-                        name="name"
-                        type="text"
-                        placeholder={addAccountType === 'ewallet' ? 'e.g. GrabPay' : 'e.g. Security Bank'}
-                        maxLength={NAME_MAX}
-                        required
-                        autoFocus
-                        onInput={clearValidity}
-                      />
-                    </label>
-                  )}
-                  <label className="field balance">
-                    <span>Starting balance</span>
-                    <input name="balance" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" onInput={clearValidity} />
-                  </label>
-                  <button type="submit" className="btn ink">Add</button>
-                  {addForm === 'accounts' && hasAccounts && (
-                    <button type="button" className="btn outline" onClick={closeAddForm}>
-                      Cancel
-                    </button>
-                  )}
-                </form>
-              ) : (
-                <button
-                  ref={addBtnRef}
-                  type="button"
-                  className="add-row"
-                  onClick={() => {
-                    resetAddAccountDraft('bank');
-                    setAddForm('accounts');
-                  }}
-                >
-                  <span className="add-dot" aria-hidden="true"><Plus size={20} strokeWidth={2.5} /></span>
-                  Add account
-                </button>
-              )}
-
               <div className="transfers">
                 <h2>Transfers</h2>
                 {!hasAccounts ? (
@@ -4421,9 +4241,11 @@ export default function App() {
                                   >
                                     <span className="grow">
                                       <span className="transfer-route">
+                                        {t.fromId === null && <Banknote size={14} aria-hidden="true" />}
                                         {from}
                                         <ArrowRight size={14} strokeWidth={2.5} aria-hidden="true" />
                                         <span className="sr-only"> to </span>
+                                        {t.toId === null && <Banknote size={14} aria-hidden="true" />}
                                         {to}
                                       </span>
                                       <small className="muted">{[t.note, entryStamp(t, todayStr)].filter(Boolean).join(' · ')}</small>
@@ -4446,6 +4268,9 @@ export default function App() {
                         })}
                       </ul>
                     )}
+                    {transfersByWhen.length === 0 && (
+                      <p className="card-empty">No transfers yet. Move money between your accounts, or top one up from cash.</p>
+                    )}
                     {transfersByWhen.length > TRANSFERS_SHOWN && (
                       <button
                         type="button"
@@ -4456,21 +4281,11 @@ export default function App() {
                         {transfersAll ? 'Show fewer' : `Show all ${transfersByWhen.length} transfers`}
                       </button>
                     )}
-                    {addForm === 'transfer' ? (
-                      <form onSubmit={handleTransfer} onChange={clearTransferValidity} className="add-form transfer-form">
-                        {transferFields(transferDefaults)}
-                        <button type="submit" className="btn ink">Transfer</button>
-                        <button type="button" className="btn outline" onClick={closeTransferForm}>
-                          Cancel
-                        </button>
-                      </form>
-                    ) : (
-                      <button ref={transferBtnRef} type="button" className="add-row" onClick={() => setAddForm('transfer')}>
-                        <span className="add-dot" aria-hidden="true"><ArrowRightLeft size={18} strokeWidth={2.5} /></span>
-                        Transfer
-                      </button>
-                    )}
-                                      </>
+                    <button type="button" className="text-btn transfers-more" onClick={() => openAddSheet('transfer')}>
+                      <ArrowLeftRight size={16} aria-hidden="true" />
+                      Transfer money
+                    </button>
+                    </>
                 )}
               </div>
               <div className="goals">
@@ -4482,7 +4297,13 @@ export default function App() {
                     </span>
                   )}
                 </div>
-                {data.goals.length === 0 && <p className="card-empty">No savings goals yet.</p>}
+                {data.goals.length === 0 && (
+                  <p className="card-empty">
+                    No savings goals yet.
+                    <br />
+                    An emergency cushion, a laptop, next term's tuition — set a target and watch it fill.
+                  </p>
+                )}
                 {data.goals.length > 0 && (
                   <ul className="card-list">
                     {data.goals.map((goal) => {
@@ -4492,7 +4313,7 @@ export default function App() {
                       const panelId = `goal-${goal.id}`;
                       const history = [...goal.contributions].sort((a, b) => b.date.localeCompare(a.date));
                       return (
-                        <li key={goal.id} data-row={goal.id} className={`loan-row ${open ? 'is-editing' : ''} ${progress.done ? 'is-paid' : ''}`}>
+                        <li key={goal.id} data-row={goal.id} className={`goal-row ${open ? 'is-open' : ''} ${progress.done ? 'is-done-g' : ''}`}>
                           <button
                             type="button"
                             className="row-open"
@@ -4506,16 +4327,20 @@ export default function App() {
                           >
                             <span className="grow">
                               {goal.name}
-                              <small className="muted">{progress.done ? 'Reached' : `${fmt(progress.remaining)} to go`}</small>
+                              {progress.done ? (
+                                <span className="goal-badge">Reached</span>
+                              ) : (
+                                <small className="muted">{fmt(progress.remaining)} to go</small>
+                              )}
                             </span>
                             <span className="num loan-amt">
                               {fmt(progress.saved)}
                               <small className="muted">of {fmt(goal.target)}</small>
                             </span>
                           </button>
-                          <div className="loan-meta">
+                          <div className="goal-meta">
                             <div
-                              className="loan-bar"
+                              className="goal-bar"
                               role="progressbar"
                               aria-label={`Saved so far, ${goal.name}`}
                               aria-valuemin={0}
@@ -4524,9 +4349,10 @@ export default function App() {
                             >
                               <i style={{ width: `${progress.pct}%` }} />
                             </div>
+                            <span className="goal-pct">{Math.round(progress.pct)}%</span>
                           </div>
                           {open && (
-                            <div className="loan-panel" id={panelId}>
+                            <div className="goal-panel" id={panelId}>
                               {editingGoal ? (
                                 <form className="row-edit" onSubmit={(e) => saveGoal(e, goal)}>
                                   <label className="field grow">
@@ -4599,27 +4425,10 @@ export default function App() {
                     })}
                   </ul>
                 )}
-                {addForm === 'goal' ? (
-                  <form onSubmit={handleAddGoal} className="add-form">
-                    <label className="field grow">
-                      <span>Goal</span>
-                      <input name="name" type="text" placeholder="Laptop" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
-                    </label>
-                    <label className="field amount">
-                      <span>Target</span>
-                      <input name="target" type="text" inputMode="decimal" placeholder={zeroDecimal ? '20000' : '800.00'} autoComplete="off" required onInput={clearValidity} />
-                    </label>
-                    <button type="submit" className="btn ink">Add</button>
-                    <button type="button" className="btn outline" onClick={closeGoalForm}>
-                      Cancel
-                    </button>
-                  </form>
-                ) : (
-                  <button ref={goalBtnRef} type="button" className="add-row" onClick={() => setAddForm('goal')}>
-                    <span className="add-dot" aria-hidden="true"><Plus size={20} strokeWidth={2.5} /></span>
-                    Add savings goal
-                  </button>
-                )}
+                <button type="button" className="text-btn transfers-more" onClick={() => openAddSheet('goal')}>
+                  <Plus size={16} aria-hidden="true" />
+                  New goal
+                </button>
                 {data.goals.length > 0 && (
                   <p className="hint">
                     Money set aside leaves the account you take it from, but it is not spending, so your daily number
@@ -4950,6 +4759,34 @@ export default function App() {
             </>
           )}
         </div>
+
+        {view === 'today' && backupDue && (
+          <div className="slip backup-slip">
+            <Download size={18} strokeWidth={2.25} aria-hidden="true" />
+            <div className="slip-body">
+              <p>
+                Time for your weekly backup.{' '}
+                <span className="slip-meta">
+                  {lastBackup ? `Last backup ${stampDate(lastBackup).toLowerCase().replace(/^0/, '')}.` : 'No backup yet.'}
+                </span>
+              </p>
+              <div className="slip-actions">
+                <button
+                  type="button"
+                  className="btn ink"
+                  onClick={exportJSON}
+                  disabled={!!fileBusy}
+                  aria-busy={fileBusy === 'backup'}
+                >
+                  {fileBusy === 'backup' ? 'Saving…' : 'Back up'}
+                </button>
+                <button type="button" className="btn outline" onClick={snoozeBackup}>
+                  Not this week
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {}
@@ -5187,6 +5024,253 @@ export default function App() {
             </button>
           </div>
         </form>
+      </dialog>
+
+      {}
+      <dialog
+        ref={addSheetRef}
+        className={`sheet ${addSheetClosing ? 'closing' : ''}`}
+        onCancel={(e) => {
+          e.preventDefault();
+          closeAddSheet();
+        }}
+        onClick={(e) => e.target === addSheetRef.current && closeAddSheet()}
+      >
+        <div className="sheet-body">
+          <div className="sheet-head" onPointerDown={onAddSheetDragStart} onPointerMove={onAddSheetDragMove} onPointerUp={onAddSheetDragEnd} onPointerCancel={onAddSheetDragEnd}>
+            <span className="sheet-grip" aria-hidden="true" />
+            <h2>{view === 'accounts' ? ADD_SHEET_LABELS[addSheetKind] : ADD_FORMS[view] ? ADD_FORMS[view][1] : 'Add'}</h2>
+            <button type="button" className="icon-btn" onClick={() => closeAddSheet()} aria-label="Close">
+              <X size={22} strokeWidth={2} />
+            </button>
+          </div>
+          {view === 'subs' && (
+            <form id="add-subs" onSubmit={handleAddSub} className="add-form">
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">New or existing</legend>
+              <label>
+                <input type="radio" name="origin" value="new" checked={subOrigin === 'new'} onChange={() => setSubOrigin('new')} />
+                <span>New</span>
+              </label>
+              <label>
+                <input type="radio" name="origin" value="existing" checked={subOrigin === 'existing'} onChange={() => setSubOrigin('existing')} />
+                <span>Existing</span>
+              </label>
+            </fieldset>
+            <label className="field grow">
+              <span>Service</span>
+              <input name="name" type="text" placeholder="Spotify Student" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+            </label>
+            <label className="field amount">
+              <span>Per month</span>
+              <input name="cost" type="text" inputMode="decimal" placeholder="5.99" autoComplete="off" required onInput={clearValidity} />
+            </label>
+            <label className="field day">
+              <span>Billing day</span>
+              <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" placeholder="1 to 31" onInput={clearValidity} />
+            </label>
+            {accountField(defaultAccountId, 'Paid from')}
+            <button type="submit" className="btn ink">Add</button>
+            <p className="hint sub-mode grow-full">
+              {subOrigin === 'existing'
+                ? 'Nothing is logged today. It is logged from its next billing day.'
+                : "Adding one logs today's payment right away. After that it is logged on its billing day. Without a billing day it only counts toward the month."}
+            </p>
+          </form>
+        )}
+        {view === 'loans' && (
+          <form id="add-loans" onSubmit={handleAddDebt} className="add-form loans-form">
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">Direction</legend>
+              <label>
+                <input type="radio" name="type" value="i_owe" checked={loanKind === 'i_owe'} onChange={() => setLoanKind('i_owe')} />
+                <span>You owe</span>
+              </label>
+              <label>
+                <input type="radio" name="type" value="they_owe" checked={loanKind === 'they_owe'} onChange={() => setLoanKind('they_owe')} />
+                <span>Owed to you</span>
+              </label>
+              <label>
+                <input type="radio" name="type" value="installment" checked={loanKind === 'installment'} onChange={() => setLoanKind('installment')} />
+                <span>Installment</span>
+              </label>
+            </fieldset>
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">New or existing</legend>
+              <label>
+                <input type="radio" name="origin" value="new" checked={loanOrigin === 'new'} onChange={() => setLoanOrigin('new')} />
+                <span>New</span>
+              </label>
+              <label>
+                <input type="radio" name="origin" value="existing" checked={loanOrigin === 'existing'} onChange={() => setLoanOrigin('existing')} />
+                <span>Existing</span>
+              </label>
+            </fieldset>
+            <label className="field grow">
+              <span>{loanKind === 'installment' ? 'What' : 'Who'}</span>
+              <input name="person" type="text" placeholder={loanKind === 'installment' ? 'Phone' : 'Maya'} maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+            </label>
+            <label className="field amount">
+              <span>{loanKind === 'installment' ? 'Total' : 'Amount'}</span>
+              <input name="amount" type="text" inputMode="decimal" placeholder={loanKind === 'installment' ? '6000' : '12.00'} autoComplete="off" required onInput={clearValidity} />
+            </label>
+            <label className="field">
+              <span>Since</span>
+              <input name="date" type="date" defaultValue={todayStr} max={todayStr} required />
+            </label>
+            {loanKind !== 'installment' && (
+              <label className="field grow-full">
+                <span>What for</span>
+                <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
+              </label>
+            )}
+            <PlanFields key={loanKind} todayStr={todayStr} optional={loanKind !== 'installment'} />
+            {accountField(defaultAccountId, loanKind === 'installment' ? 'Paid from' : undefined)}
+            {loanOrigin === 'existing' && (
+              <label className="field amount">
+                <span>Already paid</span>
+                <input name="paidBefore" type="text" inputMode="decimal" placeholder="Optional" autoComplete="off" onInput={clearValidity} />
+              </label>
+            )}
+            {loanKind === 'installment' && loanOrigin === 'new' && (
+              <p className="hint grow-full">
+                An installment adds nothing to today. Each payment you record counts as spending on the day you pay it.
+              </p>
+            )}
+            {loanOrigin === 'existing' && (
+              <p className="hint grow-full">
+                Nothing is logged for what is already paid. Payments you record from now count on the day you pay them.
+              </p>
+            )}
+            <button type="submit" className="btn ink">Add</button>
+          </form>
+        )}
+        {view === 'accounts' && addSheetKind === 'account' && (
+          <form id="add-accounts" onSubmit={handleAddAccount} className="add-form">
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">Kind of account</legend>
+              {ACCOUNT_TYPES.map(([value, label]) => (
+                <label key={value}>
+                  <input
+                    type="radio"
+                    name="type"
+                    value={value}
+                    checked={addAccountType === value}
+                    onChange={() => resetAddAccountDraft(value)}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </fieldset>
+            <label className="field grow">
+              <span>{accountTypeLabel(addAccountType)}</span>
+              <select
+                name="preset"
+                value={addAccountPreset}
+                autoFocus
+                onChange={(e) => {
+                  e.currentTarget.setCustomValidity('');
+                  setAddAccountPreset(e.currentTarget.value);
+                }}
+              >
+                {(ACCOUNT_PRESETS[addAccountType] || ACCOUNT_PRESETS.bank).map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+                <option value={CUSTOM_PRESET}>Custom</option>
+              </select>
+            </label>
+            {addAccountPreset === CUSTOM_PRESET && (
+              <label className="field grow">
+                <span>Custom name</span>
+                <input
+                  name="name"
+                  type="text"
+                  placeholder={addAccountType === 'ewallet' ? 'e.g. GrabPay' : 'e.g. Security Bank'}
+                  maxLength={NAME_MAX}
+                  required
+                  autoFocus
+                  onInput={clearValidity}
+                />
+              </label>
+            )}
+            <label className="field balance">
+              <span>Starting balance</span>
+              <input name="balance" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" onInput={clearValidity} />
+            </label>
+            <button type="submit" className="btn ink">Add</button>
+          </form>
+        )}
+        {view === 'accounts' && addSheetKind === 'transfer' && (
+          <form id="add-transfer" onSubmit={handleTransfer} onChange={clearTransferValidity} className="add-form">
+            <div className="transfer-sides">
+              <label className="field grow">
+                <span>From</span>
+                <select name="fromId" defaultValue={sideValue(transferDefaults.fromId)} autoFocus>
+                  {sideOptions()}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="swap-btn"
+                aria-label="Swap from and to"
+                onClick={(e) => {
+                  const form = e.currentTarget.form;
+                  [form.elements.fromId.value, form.elements.toId.value] = [form.elements.toId.value, form.elements.fromId.value];
+                  form.elements.toId.setCustomValidity('');
+                }}
+              >
+                <ArrowLeftRight size={18} aria-hidden="true" />
+              </button>
+              <label className="field grow">
+                <span>To</span>
+                <select name="toId" defaultValue={sideValue(transferDefaults.toId)}>
+                  {sideOptions()}
+                </select>
+              </label>
+            </div>
+            <label className="field big-amount">
+              <span>Amount</span>
+              <div className="amount-wrap">
+                <span className="amount-sym">{sym}</span>
+                <input name="amount" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={clearValidity} />
+              </div>
+            </label>
+            <div className="transfer-tail">
+              <label className="field">
+                <span>Date</span>
+                <input name="date" type="date" defaultValue={todayStr} max={todayStr} required />
+              </label>
+              <label className="field grow">
+                <span>Note</span>
+                <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
+              </label>
+            </div>
+            <div className="sheet-foot">
+              <button type="submit" className="btn ink full big">Transfer</button>
+            </div>
+          </form>
+        )}
+        {view === 'accounts' && addSheetKind === 'goal' && (
+          <form id="add-goal" onSubmit={handleAddGoal} className="add-form">
+            <label className="field grow">
+              <span>Goal</span>
+              <input name="name" type="text" placeholder="Laptop" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+            </label>
+            <label className="field big-amount">
+              <span>Target</span>
+              <div className="amount-wrap">
+                <span className="amount-sym">{sym}</span>
+                <input name="target" type="text" inputMode="decimal" placeholder={zeroDecimal ? '20000' : '800.00'} autoComplete="off" required onInput={clearValidity} />
+              </div>
+            </label>
+            <div className="sheet-foot">
+              <button type="submit" className="btn ink full big">Set goal</button>
+            </div>
+          </form>
+        )}
+        </div>
       </dialog>
 
       {}
