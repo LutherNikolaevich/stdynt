@@ -1522,6 +1522,9 @@ export default function App() {
       if (accountRow) {
         accountRow.scrollLeft = Math.max(0, pickedAccount.offsetLeft - (accountRow.clientWidth - pickedAccount.offsetWidth) / 2);
       }
+      // A previous session can leave the recents row half-scrolled.
+      const recentRow = sheetRef.current?.querySelector('.recent-row');
+      if (recentRow) recentRow.scrollLeft = 0;
       amountInputRef.current?.focus();
     });
   };
