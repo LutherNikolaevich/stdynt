@@ -4838,7 +4838,13 @@ export default function App() {
           >
             <span className="sheet-grip" aria-hidden="true" />
             <h2>
-              {editing ? `Edit ${sheetKind === 'income' ? 'income' : 'expense'}` : 'New entry'}
+              {editing
+                ? editing.note.trim()
+                  ? `Edit · ${editing.note.trim()}`
+                  : `Edit ${sheetKind === 'income' ? 'income' : 'expense'}`
+                : sheetKind === 'income'
+                  ? 'New income'
+                  : 'New expense'}
             </h2>
             <button type="button" className="icon-btn" onClick={() => closeSheet()} aria-label="Close">
               <X size={22} strokeWidth={2} />
