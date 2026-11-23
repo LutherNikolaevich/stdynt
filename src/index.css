@@ -3821,6 +3821,11 @@ button[aria-busy='true']:disabled {
     --nav-h: 48px;
   }
 
+  /* Keep today's number (bottom of the well) on screen at ~390px of height. */
+  .well {
+    min-height: 176px;
+  }
+
   /* Settings has no bottom nav, so there the header's Back link stays pinned. */
   .app:not(.view-settings) .topbar {
     position: static;
