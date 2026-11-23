@@ -18,6 +18,8 @@ import {
   Search,
   Wallet,
   ArrowRight,
+  ArrowLeftRight,
+  Banknote,
   Smartphone,
   RefreshCw,
   SlidersHorizontal
@@ -368,6 +370,11 @@ const ADD_FORMS = {
   subs: ['add-subs', 'Add subscription'],
   loans: ['add-loans', 'Add loan'],
   accounts: ['add-accounts', 'Add account']
+};
+const ADD_SHEET_LABELS = {
+  account: 'Add account',
+  transfer: 'Transfer money',
+  goal: 'New savings goal'
 };
 const readRoute = () => {
   const h = window.location.hash.replace(/^#\/?/, '');
@@ -858,6 +865,7 @@ export default function App() {
   const [sheetClosing, setSheetClosing] = useState(false);
   const addSheetRef = useRef(null);
   const [addSheetClosing, setAddSheetClosing] = useState(false);
+  const [addSheetKind, setAddSheetKind] = useState('account');
   const [editing, setEditing] = useState(null);
   const [sheetKind, setSheetKind] = useState('expense');
   const [notice, setNotice] = useState(
@@ -1072,7 +1080,10 @@ export default function App() {
       scrollMemoRef.current[cur] = window.scrollY;
       document.documentElement.dataset.navDir = VIEWS.indexOf(next) >= VIEWS.indexOf(cur) ? 'fwd' : 'back';
       const commit = () => {
-        flushSync(() => setView(next));
+        flushSync(() => {
+          setView(next);
+          setAddSheetKind('account');
+        });
         window.scrollTo({ top: next === 'settings' ? 0 : scrollMemoRef.current[next] || 0 });
       };
       if (document.startViewTransition && !prefersReducedMotion()) {
@@ -1554,16 +1565,19 @@ export default function App() {
     }, 240);
   };
 
-  const openAddSheet = () => {
+  const openAddSheet = (kind = 'account') => {
+    setAddSheetKind(kind);
     setAddSheetClosing(false);
     addSheetRef.current?.showModal();
     requestAnimationFrame(() => {
       const form = addSheetRef.current?.querySelector('form');
       form?.reset();
-      setSubOrigin('new');
-      setLoanKind('i_owe');
-      setLoanOrigin('new');
-      resetAddAccountDraft('bank');
+      if (kind === 'account') {
+        setSubOrigin('new');
+        setLoanKind('i_owe');
+        setLoanOrigin('new');
+        resetAddAccountDraft('bank');
+      }
       addSheetRef.current?.querySelector('input, select')?.focus();
     });
   };
@@ -2528,6 +2542,7 @@ export default function App() {
       }
     });
     form.reset();
+    closeAddSheet();
   };
 
   const saveTransfer = (e, transfer) => {
@@ -2577,6 +2592,7 @@ export default function App() {
       }
     });
     e.target.reset();
+    closeAddSheet();
   };
 
   const saveGoal = (e, goal) => {
@@ -4225,9 +4241,11 @@ export default function App() {
                                   >
                                     <span className="grow">
                                       <span className="transfer-route">
+                                        {t.fromId === null && <Banknote size={14} aria-hidden="true" />}
                                         {from}
                                         <ArrowRight size={14} strokeWidth={2.5} aria-hidden="true" />
                                         <span className="sr-only"> to </span>
+                                        {t.toId === null && <Banknote size={14} aria-hidden="true" />}
                                         {to}
                                       </span>
                                       <small className="muted">{[t.note, entryStamp(t, todayStr)].filter(Boolean).join(' · ')}</small>
@@ -4250,6 +4268,9 @@ export default function App() {
                         })}
                       </ul>
                     )}
+                    {transfersByWhen.length === 0 && (
+                      <p className="card-empty">No transfers yet. Move money between your accounts, or top one up from cash.</p>
+                    )}
                     {transfersByWhen.length > TRANSFERS_SHOWN && (
                       <button
                         type="button"
@@ -4260,11 +4281,11 @@ export default function App() {
                         {transfersAll ? 'Show fewer' : `Show all ${transfersByWhen.length} transfers`}
                       </button>
                     )}
-                    <form onSubmit={handleTransfer} onChange={clearTransferValidity} className="add-form transfer-form">
-                        {transferFields(transferDefaults)}
-                        <button type="submit" className="btn ink">Transfer</button>
-                      </form>
-                                      </>
+                    <button type="button" className="text-btn transfers-more" onClick={() => openAddSheet('transfer')}>
+                      <ArrowLeftRight size={16} aria-hidden="true" />
+                      Transfer money
+                    </button>
+                    </>
                 )}
               </div>
               <div className="goals">
@@ -4276,7 +4297,13 @@ export default function App() {
                     </span>
                   )}
                 </div>
-                {data.goals.length === 0 && <p className="card-empty">No savings goals yet.</p>}
+                {data.goals.length === 0 && (
+                  <p className="card-empty">
+                    No savings goals yet.
+                    <br />
+                    An emergency cushion, a laptop, next term's tuition — set a target and watch it fill.
+                  </p>
+                )}
                 {data.goals.length > 0 && (
                   <ul className="card-list">
                     {data.goals.map((goal) => {
@@ -4286,7 +4313,7 @@ export default function App() {
                       const panelId = `goal-${goal.id}`;
                       const history = [...goal.contributions].sort((a, b) => b.date.localeCompare(a.date));
                       return (
-                        <li key={goal.id} data-row={goal.id} className={`loan-row ${open ? 'is-editing' : ''} ${progress.done ? 'is-paid' : ''}`}>
+                        <li key={goal.id} data-row={goal.id} className={`goal-row ${open ? 'is-open' : ''} ${progress.done ? 'is-done-g' : ''}`}>
                           <button
                             type="button"
                             className="row-open"
@@ -4300,16 +4327,20 @@ export default function App() {
                           >
                             <span className="grow">
                               {goal.name}
-                              <small className="muted">{progress.done ? 'Reached' : `${fmt(progress.remaining)} to go`}</small>
+                              {progress.done ? (
+                                <span className="goal-badge">Reached</span>
+                              ) : (
+                                <small className="muted">{fmt(progress.remaining)} to go</small>
+                              )}
                             </span>
                             <span className="num loan-amt">
                               {fmt(progress.saved)}
                               <small className="muted">of {fmt(goal.target)}</small>
                             </span>
                           </button>
-                          <div className="loan-meta">
+                          <div className="goal-meta">
                             <div
-                              className="loan-bar"
+                              className="goal-bar"
                               role="progressbar"
                               aria-label={`Saved so far, ${goal.name}`}
                               aria-valuemin={0}
@@ -4318,9 +4349,10 @@ export default function App() {
                             >
                               <i style={{ width: `${progress.pct}%` }} />
                             </div>
+                            <span className="goal-pct">{Math.round(progress.pct)}%</span>
                           </div>
                           {open && (
-                            <div className="loan-panel" id={panelId}>
+                            <div className="goal-panel" id={panelId}>
                               {editingGoal ? (
                                 <form className="row-edit" onSubmit={(e) => saveGoal(e, goal)}>
                                   <label className="field grow">
@@ -4393,17 +4425,10 @@ export default function App() {
                     })}
                   </ul>
                 )}
-                <form onSubmit={handleAddGoal} className="add-form">
-                    <label className="field grow">
-                      <span>Goal</span>
-                      <input name="name" type="text" placeholder="Laptop" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
-                    </label>
-                    <label className="field amount">
-                      <span>Target</span>
-                      <input name="target" type="text" inputMode="decimal" placeholder={zeroDecimal ? '20000' : '800.00'} autoComplete="off" required onInput={clearValidity} />
-                    </label>
-                    <button type="submit" className="btn ink">Add</button>
-                  </form>
+                <button type="button" className="text-btn transfers-more" onClick={() => openAddSheet('goal')}>
+                  <Plus size={16} aria-hidden="true" />
+                  New goal
+                </button>
                 {data.goals.length > 0 && (
                   <p className="hint">
                     Money set aside leaves the account you take it from, but it is not spending, so your daily number
@@ -5014,7 +5039,7 @@ export default function App() {
         <div className="sheet-body">
           <div className="sheet-head" onPointerDown={onAddSheetDragStart} onPointerMove={onAddSheetDragMove} onPointerUp={onAddSheetDragEnd} onPointerCancel={onAddSheetDragEnd}>
             <span className="sheet-grip" aria-hidden="true" />
-            <h2>{ADD_FORMS[view] ? ADD_FORMS[view][1] : 'Add'}</h2>
+            <h2>{view === 'accounts' ? ADD_SHEET_LABELS[addSheetKind] : ADD_FORMS[view] ? ADD_FORMS[view][1] : 'Add'}</h2>
             <button type="button" className="icon-btn" onClick={() => closeAddSheet()} aria-label="Close">
               <X size={22} strokeWidth={2} />
             </button>
@@ -5120,7 +5145,7 @@ export default function App() {
             <button type="submit" className="btn ink">Add</button>
           </form>
         )}
-        {view === 'accounts' && (
+        {view === 'accounts' && addSheetKind === 'account' && (
           <form id="add-accounts" onSubmit={handleAddAccount} className="add-form">
             <fieldset className="radio-seg grow-full">
               <legend className="sr-only">Kind of account</legend>
@@ -5175,6 +5200,74 @@ export default function App() {
               <input name="balance" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" onInput={clearValidity} />
             </label>
             <button type="submit" className="btn ink">Add</button>
+          </form>
+        )}
+        {view === 'accounts' && addSheetKind === 'transfer' && (
+          <form id="add-transfer" onSubmit={handleTransfer} onChange={clearTransferValidity} className="add-form">
+            <div className="transfer-sides">
+              <label className="field grow">
+                <span>From</span>
+                <select name="fromId" defaultValue={sideValue(transferDefaults.fromId)} autoFocus>
+                  {sideOptions()}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="swap-btn"
+                aria-label="Swap from and to"
+                onClick={(e) => {
+                  const form = e.currentTarget.form;
+                  [form.elements.fromId.value, form.elements.toId.value] = [form.elements.toId.value, form.elements.fromId.value];
+                  form.elements.toId.setCustomValidity('');
+                }}
+              >
+                <ArrowLeftRight size={18} aria-hidden="true" />
+              </button>
+              <label className="field grow">
+                <span>To</span>
+                <select name="toId" defaultValue={sideValue(transferDefaults.toId)}>
+                  {sideOptions()}
+                </select>
+              </label>
+            </div>
+            <label className="field big-amount">
+              <span>Amount</span>
+              <div className="amount-wrap">
+                <span className="amount-sym">{sym}</span>
+                <input name="amount" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={clearValidity} />
+              </div>
+            </label>
+            <div className="transfer-tail">
+              <label className="field">
+                <span>Date</span>
+                <input name="date" type="date" defaultValue={todayStr} max={todayStr} required />
+              </label>
+              <label className="field grow">
+                <span>Note</span>
+                <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
+              </label>
+            </div>
+            <div className="sheet-foot">
+              <button type="submit" className="btn ink full big">Transfer</button>
+            </div>
+          </form>
+        )}
+        {view === 'accounts' && addSheetKind === 'goal' && (
+          <form id="add-goal" onSubmit={handleAddGoal} className="add-form">
+            <label className="field grow">
+              <span>Goal</span>
+              <input name="name" type="text" placeholder="Laptop" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+            </label>
+            <label className="field big-amount">
+              <span>Target</span>
+              <div className="amount-wrap">
+                <span className="amount-sym">{sym}</span>
+                <input name="target" type="text" inputMode="decimal" placeholder={zeroDecimal ? '20000' : '800.00'} autoComplete="off" required onInput={clearValidity} />
+              </div>
+            </label>
+            <div className="sheet-foot">
+              <button type="submit" className="btn ink full big">Set goal</button>
+            </div>
           </form>
         )}
         </div>
