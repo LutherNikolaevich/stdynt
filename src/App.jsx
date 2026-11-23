@@ -856,6 +856,8 @@ export default function App() {
   const leavingRef = useRef(false);
   const [stampKey, setStampKey] = useState(0);
   const [sheetClosing, setSheetClosing] = useState(false);
+  const addSheetRef = useRef(null);
+  const [addSheetClosing, setAddSheetClosing] = useState(false);
   const [editing, setEditing] = useState(null);
   const [sheetKind, setSheetKind] = useState('expense');
   const [notice, setNotice] = useState(
@@ -1168,7 +1170,7 @@ export default function App() {
         leaveSettings();
       } else if ((e.key === 'n' || e.key === 'N') && !e.shiftKey && viewRef.current !== 'settings') {
         e.preventDefault();
-        openSheet();
+        primaryAdd();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -1547,6 +1549,59 @@ export default function App() {
       setSheetClosing(false);
       if (typeof after === 'function') after();
     }, 240);
+  };
+
+  const openAddSheet = () => {
+    setAddSheetClosing(false);
+    addSheetRef.current?.showModal();
+    requestAnimationFrame(() => {
+      const form = addSheetRef.current?.querySelector('form');
+      form?.reset();
+      setSubOrigin('new');
+      setLoanKind('i_owe');
+      setLoanOrigin('new');
+      resetAddAccountDraft('bank');
+      addSheetRef.current?.querySelector('input, select')?.focus();
+    });
+  };
+  const closeAddSheet = () => {
+    if (addSheetClosing) return;
+    setAddSheetClosing(true);
+    setTimeout(() => {
+      addSheetRef.current?.close();
+      if (addSheetRef.current) {
+        addSheetRef.current.style.transform = '';
+        addSheetRef.current.style.transition = '';
+      }
+      setAddSheetClosing(false);
+    }, 240);
+  };
+
+  const onAddSheetDragStart = (e) => {
+    if (!isPhoneLayout() || e.button > 0 || e.target.closest('button')) return;
+    dragRef.current = { y: e.clientY, t: performance.now(), dy: 0 };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    if (addSheetRef.current) addSheetRef.current.style.transition = 'none';
+  };
+  const onAddSheetDragMove = (e) => {
+    const drag = dragRef.current;
+    if (!drag || !addSheetRef.current) return;
+    drag.dy = Math.max(0, e.clientY - drag.y);
+    addSheetRef.current.style.transform = `translateY(${drag.dy}px)`;
+  };
+  const onAddSheetDragEnd = () => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    const el = addSheetRef.current;
+    if (!drag || !el) return;
+    const speed = drag.dy / Math.max(1, performance.now() - drag.t);
+    if (drag.dy > 110 || (drag.dy > 40 && speed > 0.6)) {
+      el.style.transition = '';
+      closeAddSheet();
+    } else {
+      el.style.transition = 'transform 0.4s var(--spring)';
+      el.style.transform = '';
+    }
   };
 
   const onSheetDragStart = (e) => {
@@ -1955,6 +2010,7 @@ export default function App() {
       }
     });
     e.target.reset();
+    closeAddSheet();
   };
 
   const saveSub = (e, sub) => {
@@ -2141,6 +2197,7 @@ export default function App() {
     e.target.reset();
     setLoanKind('i_owe');
     setLoanOrigin('new');
+    closeAddSheet();
   };
 
   // Reads the plan inputs. null means the loan has no plan; undefined means a field was rejected.
@@ -2375,6 +2432,7 @@ export default function App() {
     });
     form.reset();
     resetAddAccountDraft('bank', nextAccounts);
+    closeAddSheet();
   };
 
   const saveAccount = (e, acc) => {
@@ -3043,12 +3101,7 @@ export default function App() {
   const accountSplit =
     accounts.length > 2 && accounts.some((a) => a.type === 'ewallet') && accounts.some((a) => a.type !== 'ewallet');
   const fabTarget = ADD_FORMS[view];
-  const fabClick = () => {
-    if (!fabTarget) return openSheet();
-    const form = document.getElementById(fabTarget[0]);
-    form?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    form?.querySelector('input, select')?.focus({ preventScroll: true });
-  };
+  const primaryAdd = () => (ADD_FORMS[viewRef.current] ? openAddSheet() : openSheet());
 
   return (
     <div className={`app view-${view}`}>
@@ -3089,7 +3142,7 @@ export default function App() {
       <div className="rail">
         <button
           className={`fab ${fabCompact ? 'compact' : ''}`}
-          onClick={fabClick}
+          onClick={primaryAdd}
           aria-label={fabTarget ? fabTarget[1] : 'Log expense'}
           aria-keyshortcuts="N"
         >
@@ -3743,38 +3796,6 @@ export default function App() {
                   })}
                 </ul>
               )}
-              <form id="add-subs" onSubmit={handleAddSub} className="add-form">
-                  <fieldset className="radio-seg grow-full">
-                    <legend className="sr-only">New or existing</legend>
-                    <label>
-                      <input type="radio" name="origin" value="new" checked={subOrigin === 'new'} onChange={() => setSubOrigin('new')} />
-                      <span>New</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="origin" value="existing" checked={subOrigin === 'existing'} onChange={() => setSubOrigin('existing')} />
-                      <span>Existing</span>
-                    </label>
-                  </fieldset>
-                  <label className="field grow">
-                    <span>Service</span>
-                    <input name="name" type="text" placeholder="Spotify Student" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
-                  </label>
-                  <label className="field amount">
-                    <span>Per month</span>
-                    <input name="cost" type="text" inputMode="decimal" placeholder="5.99" autoComplete="off" required onInput={clearValidity} />
-                  </label>
-                  <label className="field day">
-                    <span>Billing day</span>
-                    <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" placeholder="1 to 31" onInput={clearValidity} />
-                  </label>
-                  {accountField(defaultAccountId, 'Paid from')}
-                  <button type="submit" className="btn ink">Add</button>
-                </form>
-<p className="hint sub-mode">
-                {subOrigin === 'existing'
-                  ? 'Nothing is logged today. It is logged from its next billing day.'
-                  : "Adding one logs today's payment right away. After that it is logged on its billing day. Without a billing day it only counts toward the month."}
-              </p>
             </section>
           )}
 
@@ -4058,73 +4079,6 @@ export default function App() {
                   })}
                 </ul>
               )}
-              <form id="add-loans" onSubmit={handleAddDebt} className="add-form loans-form">
-                  <fieldset className="radio-seg grow-full">
-                    <legend className="sr-only">Direction</legend>
-                    <label>
-                      <input type="radio" name="type" value="i_owe" checked={loanKind === 'i_owe'} onChange={() => setLoanKind('i_owe')} />
-                      <span>You owe</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="type" value="they_owe" checked={loanKind === 'they_owe'} onChange={() => setLoanKind('they_owe')} />
-                      <span>Owed to you</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="type" value="installment" checked={loanKind === 'installment'} onChange={() => setLoanKind('installment')} />
-                      <span>Installment</span>
-                    </label>
-                  </fieldset>
-                  <fieldset className="radio-seg grow-full">
-                    <legend className="sr-only">New or existing</legend>
-                    <label>
-                      <input type="radio" name="origin" value="new" checked={loanOrigin === 'new'} onChange={() => setLoanOrigin('new')} />
-                      <span>New</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="origin" value="existing" checked={loanOrigin === 'existing'} onChange={() => setLoanOrigin('existing')} />
-                      <span>Existing</span>
-                    </label>
-                  </fieldset>
-                  <label className="field grow">
-                    <span>{loanKind === 'installment' ? 'What' : 'Who'}</span>
-                    <input name="person" type="text" placeholder={loanKind === 'installment' ? 'Phone' : 'Maya'} maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
-                  </label>
-                  <label className="field amount">
-                    <span>{loanKind === 'installment' ? 'Total' : 'Amount'}</span>
-                    <input name="amount" type="text" inputMode="decimal" placeholder={loanKind === 'installment' ? '6000' : '12.00'} autoComplete="off" required onInput={clearValidity} />
-                  </label>
-                  <label className="field">
-                    <span>Since</span>
-                    <input name="date" type="date" defaultValue={todayStr} max={todayStr} required />
-                  </label>
-                  {loanKind !== 'installment' && (
-                    <label className="field grow-full">
-                      <span>What for</span>
-                      <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
-                    </label>
-                  )}
-                  <PlanFields key={loanKind} todayStr={todayStr} optional={loanKind !== 'installment'} />
-                  {accountField(defaultAccountId, loanKind === 'installment' ? 'Paid from' : undefined)}
-                  {loanOrigin === 'existing' && (
-                    <label className="field amount">
-                      <span>Already paid</span>
-                      <input name="paidBefore" type="text" inputMode="decimal" placeholder="Optional" autoComplete="off" onInput={clearValidity} />
-                    </label>
-                  )}
-                  {loanKind === 'installment' && loanOrigin === 'new' && (
-                    <p className="hint grow-full">
-                      An installment adds nothing to today. Each payment you record counts as spending on the day you
-                      pay it.
-                    </p>
-                  )}
-                  {loanOrigin === 'existing' && (
-                    <p className="hint grow-full">
-                      Nothing is logged for what is already paid. Payments you record from now count on the day you pay
-                      them.
-                    </p>
-                  )}
-                  <button type="submit" className="btn ink">Add</button>
-                </form>
             </section>
           )}
 
@@ -4262,62 +4216,6 @@ export default function App() {
                   })}
                 </ul>
               )}
-              <form id="add-accounts" onSubmit={handleAddAccount} className="add-form">
-                  <fieldset className="radio-seg grow-full">
-                    <legend className="sr-only">Kind of account</legend>
-                    {ACCOUNT_TYPES.map(([value, label]) => (
-                      <label key={value}>
-                        <input
-                          type="radio"
-                          name="type"
-                          value={value}
-                          checked={addAccountType === value}
-                          onChange={() => resetAddAccountDraft(value)}
-                        />
-                        <span>{label}</span>
-                      </label>
-                    ))}
-                  </fieldset>
-                  <label className="field grow">
-                    <span>{accountTypeLabel(addAccountType)}</span>
-                    <select
-                      name="preset"
-                      value={addAccountPreset}
-                      autoFocus
-                      onChange={(e) => {
-                        e.currentTarget.setCustomValidity('');
-                        setAddAccountPreset(e.currentTarget.value);
-                      }}
-                    >
-                      {(ACCOUNT_PRESETS[addAccountType] || ACCOUNT_PRESETS.bank).map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                      <option value={CUSTOM_PRESET}>Custom</option>
-                    </select>
-                  </label>
-                  {addAccountPreset === CUSTOM_PRESET && (
-                    <label className="field grow">
-                      <span>Custom name</span>
-                      <input
-                        name="name"
-                        type="text"
-                        placeholder={addAccountType === 'ewallet' ? 'e.g. GrabPay' : 'e.g. Security Bank'}
-                        maxLength={NAME_MAX}
-                        required
-                        autoFocus
-                        onInput={clearValidity}
-                      />
-                    </label>
-                  )}
-                  <label className="field balance">
-                    <span>Starting balance</span>
-                    <input name="balance" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" onInput={clearValidity} />
-                  </label>
-                  <button type="submit" className="btn ink">Add</button>
-                </form>
-
               <div className="transfers">
                 <h2>Transfers</h2>
                 {!hasAccounts ? (
@@ -5098,6 +4996,185 @@ export default function App() {
             </button>
           </div>
         </form>
+      </dialog>
+
+      {}
+      <dialog
+        ref={addSheetRef}
+        className={`sheet ${addSheetClosing ? 'closing' : ''}`}
+        onCancel={(e) => {
+          e.preventDefault();
+          closeAddSheet();
+        }}
+        onClick={(e) => e.target === addSheetRef.current && closeAddSheet()}
+      >
+        <div className="sheet-body">
+          <div className="sheet-head" onPointerDown={onAddSheetDragStart} onPointerMove={onAddSheetDragMove} onPointerUp={onAddSheetDragEnd} onPointerCancel={onAddSheetDragEnd}>
+            <span className="sheet-grip" aria-hidden="true" />
+            <h2>{ADD_FORMS[view] ? ADD_FORMS[view][1] : 'Add'}</h2>
+            <button type="button" className="icon-btn" onClick={() => closeAddSheet()} aria-label="Close">
+              <X size={22} strokeWidth={2} />
+            </button>
+          </div>
+          {view === 'subs' && (
+            <form id="add-subs" onSubmit={handleAddSub} className="add-form">
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">New or existing</legend>
+              <label>
+                <input type="radio" name="origin" value="new" checked={subOrigin === 'new'} onChange={() => setSubOrigin('new')} />
+                <span>New</span>
+              </label>
+              <label>
+                <input type="radio" name="origin" value="existing" checked={subOrigin === 'existing'} onChange={() => setSubOrigin('existing')} />
+                <span>Existing</span>
+              </label>
+            </fieldset>
+            <label className="field grow">
+              <span>Service</span>
+              <input name="name" type="text" placeholder="Spotify Student" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+            </label>
+            <label className="field amount">
+              <span>Per month</span>
+              <input name="cost" type="text" inputMode="decimal" placeholder="5.99" autoComplete="off" required onInput={clearValidity} />
+            </label>
+            <label className="field day">
+              <span>Billing day</span>
+              <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" placeholder="1 to 31" onInput={clearValidity} />
+            </label>
+            {accountField(defaultAccountId, 'Paid from')}
+            <button type="submit" className="btn ink">Add</button>
+            <p className="hint sub-mode grow-full">
+              {subOrigin === 'existing'
+                ? 'Nothing is logged today. It is logged from its next billing day.'
+                : "Adding one logs today's payment right away. After that it is logged on its billing day. Without a billing day it only counts toward the month."}
+            </p>
+          </form>
+        )}
+        {view === 'loans' && (
+          <form id="add-loans" onSubmit={handleAddDebt} className="add-form loans-form">
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">Direction</legend>
+              <label>
+                <input type="radio" name="type" value="i_owe" checked={loanKind === 'i_owe'} onChange={() => setLoanKind('i_owe')} />
+                <span>You owe</span>
+              </label>
+              <label>
+                <input type="radio" name="type" value="they_owe" checked={loanKind === 'they_owe'} onChange={() => setLoanKind('they_owe')} />
+                <span>Owed to you</span>
+              </label>
+              <label>
+                <input type="radio" name="type" value="installment" checked={loanKind === 'installment'} onChange={() => setLoanKind('installment')} />
+                <span>Installment</span>
+              </label>
+            </fieldset>
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">New or existing</legend>
+              <label>
+                <input type="radio" name="origin" value="new" checked={loanOrigin === 'new'} onChange={() => setLoanOrigin('new')} />
+                <span>New</span>
+              </label>
+              <label>
+                <input type="radio" name="origin" value="existing" checked={loanOrigin === 'existing'} onChange={() => setLoanOrigin('existing')} />
+                <span>Existing</span>
+              </label>
+            </fieldset>
+            <label className="field grow">
+              <span>{loanKind === 'installment' ? 'What' : 'Who'}</span>
+              <input name="person" type="text" placeholder={loanKind === 'installment' ? 'Phone' : 'Maya'} maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+            </label>
+            <label className="field amount">
+              <span>{loanKind === 'installment' ? 'Total' : 'Amount'}</span>
+              <input name="amount" type="text" inputMode="decimal" placeholder={loanKind === 'installment' ? '6000' : '12.00'} autoComplete="off" required onInput={clearValidity} />
+            </label>
+            <label className="field">
+              <span>Since</span>
+              <input name="date" type="date" defaultValue={todayStr} max={todayStr} required />
+            </label>
+            {loanKind !== 'installment' && (
+              <label className="field grow-full">
+                <span>What for</span>
+                <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
+              </label>
+            )}
+            <PlanFields key={loanKind} todayStr={todayStr} optional={loanKind !== 'installment'} />
+            {accountField(defaultAccountId, loanKind === 'installment' ? 'Paid from' : undefined)}
+            {loanOrigin === 'existing' && (
+              <label className="field amount">
+                <span>Already paid</span>
+                <input name="paidBefore" type="text" inputMode="decimal" placeholder="Optional" autoComplete="off" onInput={clearValidity} />
+              </label>
+            )}
+            {loanKind === 'installment' && loanOrigin === 'new' && (
+              <p className="hint grow-full">
+                An installment adds nothing to today. Each payment you record counts as spending on the day you pay it.
+              </p>
+            )}
+            {loanOrigin === 'existing' && (
+              <p className="hint grow-full">
+                Nothing is logged for what is already paid. Payments you record from now count on the day you pay them.
+              </p>
+            )}
+            <button type="submit" className="btn ink">Add</button>
+          </form>
+        )}
+        {view === 'accounts' && (
+          <form id="add-accounts" onSubmit={handleAddAccount} className="add-form">
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">Kind of account</legend>
+              {ACCOUNT_TYPES.map(([value, label]) => (
+                <label key={value}>
+                  <input
+                    type="radio"
+                    name="type"
+                    value={value}
+                    checked={addAccountType === value}
+                    onChange={() => resetAddAccountDraft(value)}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </fieldset>
+            <label className="field grow">
+              <span>{accountTypeLabel(addAccountType)}</span>
+              <select
+                name="preset"
+                value={addAccountPreset}
+                autoFocus
+                onChange={(e) => {
+                  e.currentTarget.setCustomValidity('');
+                  setAddAccountPreset(e.currentTarget.value);
+                }}
+              >
+                {(ACCOUNT_PRESETS[addAccountType] || ACCOUNT_PRESETS.bank).map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+                <option value={CUSTOM_PRESET}>Custom</option>
+              </select>
+            </label>
+            {addAccountPreset === CUSTOM_PRESET && (
+              <label className="field grow">
+                <span>Custom name</span>
+                <input
+                  name="name"
+                  type="text"
+                  placeholder={addAccountType === 'ewallet' ? 'e.g. GrabPay' : 'e.g. Security Bank'}
+                  maxLength={NAME_MAX}
+                  required
+                  autoFocus
+                  onInput={clearValidity}
+                />
+              </label>
+            )}
+            <label className="field balance">
+              <span>Starting balance</span>
+              <input name="balance" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" onInput={clearValidity} />
+            </label>
+            <button type="submit" className="btn ink">Add</button>
+          </form>
+        )}
+        </div>
       </dialog>
 
       {}
