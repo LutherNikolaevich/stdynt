@@ -2952,13 +2952,15 @@ export default function App() {
   const mathCellCount = 3 + (earnedToday > 0 ? 1 : 0) + (movedToday !== 0 ? 1 : 0);
   const mathColumnsClass = ['', '', '', '', 'four', 'five'][mathCellCount];
   const wellPool = availableToday + spentToday;
-  const wellLevel = hasDaily
-    ? availableToday > 0 && wellPool > 0
-      ? Math.min(1, availableToday / wellPool).toFixed(4)
-      : 0
-    : fallbackIncome > 0
-      ? 1
-      : 0;
+  const wellLevel = showWell
+    ? hasDaily
+      ? availableToday > 0 && wellPool > 0
+        ? Math.min(1, availableToday / wellPool).toFixed(4)
+        : 0
+      : fallbackIncome > 0
+        ? 1
+        : 0
+    : 0;
   const stampDigitsClass =
     formattedTodayAbs.length > 9 ? 'digits-xl' : formattedTodayAbs.length > 6 ? 'digits-lg' : '';
 
