@@ -4839,7 +4839,7 @@ export default function App() {
             <span className="sheet-grip" aria-hidden="true" />
             <h2>
               {editing
-                ? editing.note.trim()
+                ? editing.note?.trim()
                   ? `Edit · ${editing.note.trim()}`
                   : `Edit ${sheetKind === 'income' ? 'income' : 'expense'}`
                 : sheetKind === 'income'
