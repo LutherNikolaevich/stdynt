@@ -2517,6 +2517,8 @@ button[aria-busy='true']:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--panel-line);
 }
 
 .sheet {
@@ -2553,6 +2555,10 @@ button[aria-busy='true']:disabled {
   font-stretch: var(--stamp-stretch);
   font-weight: 700;
   font-size: 1.625rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sheet-head .icon-btn {
