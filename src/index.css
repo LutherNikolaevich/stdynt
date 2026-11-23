@@ -2466,6 +2466,11 @@ button[aria-busy='true']:disabled {
   min-width: 0;
 }
 
+/* add-forms moved into the sheet: drop the card margin, keep the sheet gap */
+.sheet .add-form {
+  margin-top: 0;
+}
+
 .sheet-head {
   position: relative;
   display: flex;
