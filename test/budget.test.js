@@ -54,3 +54,53 @@ test('sanitize runs the fix once', () => {
   const twice = sanitizeData({ ...raw, settings: once.settings, expenses: once.expenses, accounts: once.accounts }, opts);
   assert.equal(twice.settings.rolloverBase, 70);
 });
+
+test('monthly cash totals ignore accounts and use cash-side transfers', async () => {
+  const { computeMonthlyCash } = await import('../src/budget.js');
+  assert.equal(typeof computeMonthlyCash, 'function');
+  const period = { start: '2026-11-01', end: '2026-12-01' };
+  const totals = computeMonthlyCash({
+    expenses: [
+      { amount: 30, date: todayStr },
+      { amount: 40, date: todayStr, accountId: 'bank' },
+      { amount: 60, date: todayStr, accountId: 'wallet' },
+      { amount: 999, date: '2026-10-31' }
+    ],
+    income: [{ amount: 5, date: todayStr }, { amount: 50, date: todayStr, accountId: 'bank' }],
+    subscriptions: [{ id: 'cash-sub', cost: 20 }, { id: 'bank-sub', cost: 80, accountId: 'bank' }],
+    transfers: [
+      { amount: 10, date: todayStr, fromId: null, toId: 'bank' },
+      { amount: 25, date: todayStr, fromId: 'bank', toId: null },
+      { amount: 100, date: todayStr, fromId: 'bank', toId: 'wallet' },
+      { amount: 7, date: '2026-10-31', fromId: 'bank', toId: null }
+    ],
+    period
+  });
+  assert.deepEqual(totals, { spent: 30, earned: 5, moved: 15, pending: 20 });
+  const committed = totals.spent + totals.pending;
+  const available = 500 + totals.earned + totals.moved;
+  assert.equal(committed, 50);
+  assert.equal(available, 520);
+  assert.equal(available - committed, 470);
+});
+
+test('monthly pending subscriptions use cash payments only', async () => {
+  const { computeMonthlyCash } = await import('../src/budget.js');
+  assert.equal(typeof computeMonthlyCash, 'function');
+  const period = { start: '2026-11-01', end: '2026-12-01' };
+  const totals = computeMonthlyCash({
+    expenses: [
+      { amount: 40, date: todayStr, accountId: 'bank', subId: 'a' },
+      { amount: 10, date: todayStr, subId: 'b' }
+    ],
+    income: [],
+    subscriptions: [
+      { id: 'a', cost: 20 },
+      { id: 'b', cost: 10 },
+      { id: 'c', cost: 30, existing: true, since: '2026-11-20', billingDay: 15 },
+      { id: 'd', cost: 50, accountId: 'bank' }
+    ],
+    period
+  });
+  assert.deepEqual(totals, { spent: 10, earned: 0, moved: 0, pending: 20 });
+});

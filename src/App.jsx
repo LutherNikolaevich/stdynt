@@ -47,6 +47,7 @@ import {
   goalProgress,
   clampStartDay,
   computeBudget,
+  computeMonthlyCash,
   isCash,
   foldDelta,
   uncountedReason,
@@ -1274,8 +1275,6 @@ export default function App() {
   const rolloverBase = budget.base;
   const weekendOff = hasDaily && dailyToday === 0;
 
-  const sumOf = (list) => list.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
   const todaysEntries = [
     ...data.expenses.filter((e) => e.date === todayStr && isCash(e)).map(asKind('expense')),
     ...data.income.filter((e) => e.date === todayStr && isCash(e)).map(asKind('income'))
@@ -1304,16 +1303,22 @@ export default function App() {
   }
 
   const monthlyExpenses = data.expenses.filter(inPeriod);
-  const spentMonthlyExpenses = sumOf(monthlyExpenses);
   const subLoggedThisPeriod = (sub) => paidBeforeTracking(sub, period) || monthlyExpenses.some((e) => e.subId === sub.id);
   const subsMonthly = data.subscriptions.reduce((s, sub) => s + Number(sub.cost || 0), 0);
-  const subsPending = data.subscriptions.reduce(
-    (s, sub) => s + (subLoggedThisPeriod(sub) ? 0 : Number(sub.cost || 0)),
-    0
-  );
+  const {
+    spent: spentMonthlyExpenses,
+    earned: incomeMonthly,
+    moved: movedMonthly,
+    pending: subsPending
+  } = computeMonthlyCash({
+    expenses: data.expenses,
+    income: data.income,
+    transfers: data.transfers,
+    subscriptions: data.subscriptions,
+    period
+  });
   const totalMonthlyCommitted = spentMonthlyExpenses + subsPending;
-  const incomeMonthly = sumOf(data.income.filter(inPeriod));
-  const monthAvailable = monthlyBudget + incomeMonthly;
+  const monthAvailable = monthlyBudget + incomeMonthly + movedMonthly;
   const percentMonthlyUsed = monthlyBudget > 0 ? (totalMonthlyCommitted / monthAvailable) * 100 : 0;
   const remainingMonthly = monthAvailable - totalMonthlyCommitted;
   const alertThresh = Number(data.settings.alertThreshold) || 80;

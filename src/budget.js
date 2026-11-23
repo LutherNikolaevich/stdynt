@@ -233,6 +233,19 @@ export const paidBeforeTracking = (sub, period) => {
   return false;
 };
 
+export const computeMonthlyCash = ({ expenses, income, transfers = [], subscriptions = [], period }) => {
+  const inPeriod = (e) => !!e.date && e.date >= period.start && e.date < period.end;
+  const cashExpenses = expenses.filter((e) => inPeriod(e) && isCash(e));
+  const spent = cashExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const earned = income.filter((e) => inPeriod(e) && isCash(e)).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const moved = transfers.filter(inPeriod).reduce((sum, t) => sum + cashDelta(t), 0);
+  const pending = subscriptions.filter(isCash).reduce((sum, sub) => {
+    const logged = paidBeforeTracking(sub, period) || cashExpenses.some((e) => e.subId === sub.id);
+    return sum + (logged ? 0 : Number(sub.cost || 0));
+  }, 0);
+  return { spent, earned, moved, pending };
+};
+
 export const loanRemaining = (debt) =>
   Math.max(
     0,
