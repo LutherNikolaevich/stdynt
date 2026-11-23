@@ -364,6 +364,11 @@ const MONEY_VIEWS = [
 ];
 
 const VIEWS = [...MONEY_VIEWS.map((v) => v.id), 'settings'];
+const ADD_FORMS = {
+  subs: ['add-subs', 'Add subscription'],
+  loans: ['add-loans', 'Add loan'],
+  accounts: ['add-accounts', 'Add account']
+};
 const readRoute = () => {
   const h = window.location.hash.replace(/^#\/?/, '');
   return VIEWS.includes(h) ? h : 'today';
@@ -3037,6 +3042,14 @@ export default function App() {
   const TRANSFERS_SHOWN = 5;
   const accountSplit =
     accounts.length > 2 && accounts.some((a) => a.type === 'ewallet') && accounts.some((a) => a.type !== 'ewallet');
+  const fabTarget = ADD_FORMS[view];
+  const fabClick = () => {
+    if (!fabTarget) return openSheet();
+    const form = document.getElementById(fabTarget[0]);
+    form?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    form?.querySelector('input, select')?.focus({ preventScroll: true });
+  };
+
   return (
     <div className={`app view-${view}`}>
       <header className={`topbar ${scrolled ? 'is-scrolled' : ''}`}>
@@ -3076,12 +3089,12 @@ export default function App() {
       <div className="rail">
         <button
           className={`fab ${fabCompact ? 'compact' : ''}`}
-          onClick={() => openSheet()}
-          aria-label="Log expense"
+          onClick={fabClick}
+          aria-label={fabTarget ? fabTarget[1] : 'Log expense'}
           aria-keyshortcuts="N"
         >
           <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
-          <span className="fab-label">Log expense</span>
+          <span className="fab-label">{fabTarget ? fabTarget[1] : 'Log expense'}</span>
           <kbd className="nav-kbd" aria-hidden="true">N</kbd>
         </button>
         <nav className="bottom-nav" aria-label="Money">
@@ -3730,7 +3743,7 @@ export default function App() {
                   })}
                 </ul>
               )}
-              <form onSubmit={handleAddSub} className="add-form">
+              <form id="add-subs" onSubmit={handleAddSub} className="add-form">
                   <fieldset className="radio-seg grow-full">
                     <legend className="sr-only">New or existing</legend>
                     <label>
@@ -4045,7 +4058,7 @@ export default function App() {
                   })}
                 </ul>
               )}
-              <form onSubmit={handleAddDebt} className="add-form loans-form">
+              <form id="add-loans" onSubmit={handleAddDebt} className="add-form loans-form">
                   <fieldset className="radio-seg grow-full">
                     <legend className="sr-only">Direction</legend>
                     <label>
@@ -4249,7 +4262,7 @@ export default function App() {
                   })}
                 </ul>
               )}
-              <form onSubmit={handleAddAccount} className="add-form">
+              <form id="add-accounts" onSubmit={handleAddAccount} className="add-form">
                   <fieldset className="radio-seg grow-full">
                     <legend className="sr-only">Kind of account</legend>
                     {ACCOUNT_TYPES.map(([value, label]) => (
