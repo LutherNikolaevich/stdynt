@@ -3760,8 +3760,16 @@ button[aria-busy='true']:disabled {
 }
 
 @media (max-width: 999px) {
-  .view-settings .rail {
+  .view-settings .bottom-nav {
     display: none;
+  }
+
+  .view-settings .fab {
+    bottom: calc(16px + var(--safe-b));
+  }
+
+  .app.view-settings {
+    padding-bottom: calc(104px + var(--safe-b));
   }
 }
 
