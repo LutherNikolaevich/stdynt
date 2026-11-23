@@ -16,3 +16,5 @@ graphify-out/
 
 npm-debug.log*
 *.log
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
