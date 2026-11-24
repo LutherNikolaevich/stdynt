@@ -19,6 +19,7 @@ import {
   Wallet,
   ArrowRight,
   ArrowLeftRight,
+  PiggyBank,
   Banknote,
   Smartphone,
   RefreshCw,
@@ -332,6 +333,20 @@ const rejectField = (input, message) => {
   input.reportValidity();
 };
 const clearValidity = (e) => e.currentTarget.setCustomValidity('');
+const numericLock = (e) => {
+  clearValidity(e);
+  const el = e.currentTarget;
+  const v = el.value;
+  const cleaned = v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  if (cleaned !== v) el.value = cleaned;
+};
+const textLock = (e) => {
+  clearValidity(e);
+  const el = e.currentTarget;
+  const v = el.value;
+  const cleaned = v.replace(/[0-9]/g, '');
+  if (cleaned !== v) el.value = cleaned;
+};
 const overMax = (input, amount) => {
   if (!(amount > AMOUNT_MAX)) return false;
   rejectField(input, `That's too much to track. The most is ${AMOUNT_MAX.toLocaleString('en-US')}.`);
@@ -768,7 +783,7 @@ const PlanFields = ({ plan, todayStr, optional }) => {
           </label>
           <label className="field amount">
             <span>Each</span>
-            <input name="each" type="text" inputMode="decimal" defaultValue={plan?.amount} placeholder="Even split" autoComplete="off" onInput={clearValidity} />
+            <input name="each" type="text" inputMode="decimal" defaultValue={plan?.amount} placeholder="Even split" autoComplete="off" onInput={numericLock} />
           </label>
           <label className="field grow">
             <span>How often</span>
@@ -867,6 +882,7 @@ export default function App() {
   const addSheetRef = useRef(null);
   const [addSheetClosing, setAddSheetClosing] = useState(false);
   const [addSheetKind, setAddSheetKind] = useState('account');
+  const [fabOpen, setFabOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [sheetKind, setSheetKind] = useState('expense');
   const [notice, setNotice] = useState(
@@ -879,6 +895,7 @@ export default function App() {
   const [periodOffset, setPeriodOffset] = useState(0);
   useEffect(() => {
     if (view !== 'categories') setPeriodOffset(0);
+    setFabOpen(false);
   }, [view]);
   const [hoverCat, setHoverCat] = useState(null);
   const [focusCat, setFocusCat] = useState(null);
@@ -1177,7 +1194,11 @@ export default function App() {
         leaveSettings();
       } else if ((e.key === 'n' || e.key === 'N') && !e.shiftKey && ADD_FORMS[viewRef.current]) {
         e.preventDefault();
-        viewRef.current === 'today' ? openSheet() : openAddSheet();
+        viewRef.current === 'today'
+          ? openSheet()
+          : viewRef.current === 'accounts'
+            ? setFabOpen((o) => !o)
+            : openAddSheet();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -2688,7 +2709,7 @@ export default function App() {
     <>
       <label className="field amount">
         <span>Amount</span>
-        <input name="amount" type="text" inputMode="decimal" defaultValue={c?.amount} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={clearValidity} />
+        <input name="amount" type="text" inputMode="decimal" defaultValue={c?.amount} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={numericLock} />
       </label>
       <label className="field date">
         <span>On</span>
@@ -2735,7 +2756,7 @@ export default function App() {
       </label>
       <label className="field amount">
         <span>Amount</span>
-        <input name="amount" type="text" inputMode="decimal" defaultValue={t.amount} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={clearValidity} />
+        <input name="amount" type="text" inputMode="decimal" defaultValue={t.amount} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={numericLock} />
       </label>
       <label className="field">
         <span>Date</span>
@@ -3154,7 +3175,65 @@ export default function App() {
 
       {}
       <div className="rail">
-        {fabTarget && (
+        {fabTarget && fabTarget[0] === 'add-accounts' && (
+          <>
+            {fabOpen && (
+              <div className="fab-actions">
+                <button
+                  type="button"
+                  className="fab-action"
+                  onClick={() => {
+                    setFabOpen(false);
+                    openAddSheet('account');
+                  }}
+                  aria-label="Add account"
+                >
+                  <Wallet size={20} strokeWidth={2} aria-hidden="true" />
+                  <span>Add account</span>
+                </button>
+                <button
+                  type="button"
+                  className="fab-action"
+                  onClick={() => {
+                    setFabOpen(false);
+                    openAddSheet('transfer');
+                  }}
+                  aria-label="Transfer money"
+                >
+                  <ArrowLeftRight size={20} strokeWidth={2} aria-hidden="true" />
+                  <span>Transfer</span>
+                </button>
+                <button
+                  type="button"
+                  className="fab-action"
+                  onClick={() => {
+                    setFabOpen(false);
+                    openAddSheet('goal');
+                  }}
+                  aria-label="New savings goal"
+                >
+                  <PiggyBank size={20} strokeWidth={2} aria-hidden="true" />
+                  <span>Savings goals</span>
+                </button>
+              </div>
+            )}
+            <button
+              className="fab compact"
+              onClick={() => setFabOpen((o) => !o)}
+              aria-label={fabOpen ? 'Close add menu' : fabTarget[1]}
+              aria-expanded={fabOpen}
+              aria-keyshortcuts="N"
+            >
+              {fabOpen ? (
+                <X size={22} strokeWidth={2.5} aria-hidden="true" />
+              ) : (
+                <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
+              )}
+              {!fabOpen && <kbd className="nav-kbd" aria-hidden="true">N</kbd>}
+            </button>
+          </>
+        )}
+        {fabTarget && fabTarget[0] !== 'add-accounts' && (
           <button
             className="fab compact"
             onClick={() => (view === 'today' ? openSheet() : openAddSheet())}
@@ -3739,11 +3818,11 @@ export default function App() {
                           <form className="row-edit" onSubmit={(e) => saveSub(e, sub)}>
                             <label className="field grow">
                               <span>Service</span>
-                              <input name="name" type="text" defaultValue={sub.name} maxLength={NAME_MAX} required onInput={clearValidity} />
+                              <input name="name" type="text" defaultValue={sub.name} maxLength={NAME_MAX} required onInput={textLock} />
                             </label>
                             <label className="field amount">
                               <span>Per month</span>
-                              <input name="cost" type="text" inputMode="decimal" defaultValue={sub.cost} autoComplete="off" required onInput={clearValidity} />
+                              <input name="cost" type="text" inputMode="decimal" defaultValue={sub.cost} autoComplete="off" required onInput={numericLock} />
                             </label>
                             <label className="field day">
                               <span>Billing day</span>
@@ -3935,7 +4014,7 @@ export default function App() {
                               <form key={`${left}-${rowEdit.pay ? 'pay' : 'open'}`} className="row-edit pay-form" onSubmit={(e) => recordPayment(e, debt)}>
                                 <label className="field grow">
                                   <span>{iOwe ? (plan ? 'You paid' : 'You paid back') : `${debt.person} paid back`}</span>
-                                  <input name="paid" type="text" inputMode="decimal" defaultValue={plan ? sum.nextAmount : undefined} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required autoFocus={!!rowEdit.pay} onInput={clearValidity} />
+                                  <input name="paid" type="text" inputMode="decimal" defaultValue={plan ? sum.nextAmount : undefined} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required autoFocus={!!rowEdit.pay} onInput={numericLock} />
                                 </label>
                                 <label className="field date">
                                   <span>On</span>
@@ -3985,7 +4064,7 @@ export default function App() {
                                         <form className="row-edit pay-form" onSubmit={(e) => savePayment(e, debt, p)}>
                                           <label className="field grow">
                                             <span>Paid</span>
-                                            <input name="paid" type="text" inputMode="decimal" defaultValue={p.amount} autoComplete="off" required autoFocus onInput={clearValidity} />
+                                            <input name="paid" type="text" inputMode="decimal" defaultValue={p.amount} autoComplete="off" required autoFocus onInput={numericLock} />
                                           </label>
                                           <label className="field date">
                                             <span>On</span>
@@ -4036,11 +4115,11 @@ export default function App() {
                             <form className="row-edit" onSubmit={(e) => saveDebt(e, debt)}>
                               <label className="field grow">
                                 <span>{iOwe ? 'Who or what' : 'Who'}</span>
-                                <input name="person" type="text" defaultValue={debt.person} maxLength={NAME_MAX} required onInput={clearValidity} />
+                                <input name="person" type="text" defaultValue={debt.person} maxLength={NAME_MAX} required onInput={textLock} />
                               </label>
                               <label className="field amount">
                                 <span>Total</span>
-                                <input name="amount" type="text" inputMode="decimal" defaultValue={debt.amount} autoComplete="off" required onInput={clearValidity} />
+                                <input name="amount" type="text" inputMode="decimal" defaultValue={debt.amount} autoComplete="off" required onInput={numericLock} />
                               </label>
                               <label className="field grow">
                                 <span>What for</span>
@@ -4157,7 +4236,7 @@ export default function App() {
                                   maxLength={NAME_MAX}
                                   required
                                   autoFocus
-                                  onInput={clearValidity}
+                                  onInput={textLock}
                                 />
                               </label>
                             )}
@@ -4171,7 +4250,7 @@ export default function App() {
                                 autoComplete="off"
                                 required
                                 aria-describedby={`acc-hint-${acc.id}`}
-                                onInput={clearValidity}
+                                onInput={numericLock}
                               />
                             </label>
                             <p id={`acc-hint-${acc.id}`} className="hint grow-full">
@@ -4281,10 +4360,6 @@ export default function App() {
                         {transfersAll ? 'Show fewer' : `Show all ${transfersByWhen.length} transfers`}
                       </button>
                     )}
-                    <button type="button" className="text-btn transfers-more" onClick={() => openAddSheet('transfer')}>
-                      <ArrowLeftRight size={16} aria-hidden="true" />
-                      Transfer money
-                    </button>
               </div>
               <div className="goals">
                 <div className="card-title-row">
@@ -4350,11 +4425,11 @@ export default function App() {
                                 <form className="row-edit" onSubmit={(e) => saveGoal(e, goal)}>
                                   <label className="field grow">
                                     <span>Goal</span>
-                                    <input name="name" type="text" defaultValue={goal.name} maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+                                    <input name="name" type="text" defaultValue={goal.name} maxLength={NAME_MAX} required autoFocus onInput={textLock} />
                                   </label>
                                   <label className="field amount">
                                     <span>Target</span>
-                                    <input name="target" type="text" inputMode="decimal" defaultValue={goal.target} autoComplete="off" required onInput={clearValidity} />
+                                    <input name="target" type="text" inputMode="decimal" defaultValue={goal.target} autoComplete="off" required onInput={numericLock} />
                                   </label>
                                   <div className="row-edit-actions">
                                     <button type="submit" className="btn ink">Save</button>
@@ -4418,10 +4493,6 @@ export default function App() {
                     })}
                   </ul>
                 )}
-                <button type="button" className="text-btn transfers-more" onClick={() => openAddSheet('goal')}>
-                  <Plus size={16} aria-hidden="true" />
-                  New goal
-                </button>
                 {data.goals.length > 0 && (
                   <p className="hint">
                     Money set aside leaves the account you take it from, but it is not spending, so your daily number
@@ -4475,7 +4546,7 @@ export default function App() {
                       autoComplete="off"
                       defaultValue={data.settings.monthlyBudget || ''}
                       placeholder="e.g. 600"
-                      onInput={clearValidity}
+                      onInput={numericLock}
                     />
                   </label>
                   {}
@@ -4489,7 +4560,7 @@ export default function App() {
                       autoComplete="off"
                       defaultValue={data.settings.dailyBudget || ''}
                       placeholder="e.g. 20"
-                      onInput={clearValidity}
+                      onInput={numericLock}
                       aria-describedby="set-daily-help"
                     />
                     <small id="set-daily-help">
@@ -4592,6 +4663,7 @@ export default function App() {
                           defaultValue={cat.name}
                           maxLength={CATEGORY_NAME_MAX}
                           aria-label={`Rename ${cat.name}`}
+                          onInput={textLock}
                           onBlur={(e) => renameCategory(cat, e.target)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') e.currentTarget.blur();
@@ -4654,7 +4726,7 @@ export default function App() {
                 <form onSubmit={handleAddCategory} className="add-form">
                   <label className="field grow">
                     <span>New category</span>
-                    <input name="catName" type="text" placeholder={categoryExample} maxLength={CATEGORY_NAME_MAX} required onInput={clearValidity} />
+                    <input name="catName" type="text" placeholder={categoryExample} maxLength={CATEGORY_NAME_MAX} required onInput={textLock} />
                   </label>
                   <button type="submit" className="btn ink">Add</button>
                 </form>
@@ -4894,7 +4966,7 @@ export default function App() {
                 enterKeyHint="next"
                 autoComplete="off"
                 placeholder={zeroDecimal ? '0' : '0.00'}
-                onInput={clearValidity}
+                onInput={numericLock}
                 required
               />
             </div>
@@ -5058,23 +5130,18 @@ export default function App() {
             </fieldset>
             <label className="field grow">
               <span>Service</span>
-              <input name="name" type="text" placeholder="Spotify Student" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+              <input name="name" type="text" maxLength={NAME_MAX} required autoFocus onInput={textLock} />
             </label>
             <label className="field amount">
               <span>Per month</span>
-              <input name="cost" type="text" inputMode="decimal" placeholder="5.99" autoComplete="off" required onInput={clearValidity} />
+              <input name="cost" type="text" inputMode="decimal" autoComplete="off" required onInput={numericLock} />
             </label>
             <label className="field day">
               <span>Billing day</span>
-              <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" placeholder="1 to 31" onInput={clearValidity} />
+              <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" onInput={clearValidity} />
             </label>
             {accountField(defaultAccountId, 'Paid from')}
             <button type="submit" className="btn ink">Add</button>
-            <p className="hint sub-mode grow-full">
-              {subOrigin === 'existing'
-                ? 'Nothing is logged today. It is logged from its next billing day.'
-                : "Adding one logs today's payment right away. After that it is logged on its billing day. Without a billing day it only counts toward the month."}
-            </p>
           </form>
         )}
         {view === 'loans' && (
@@ -5107,11 +5174,11 @@ export default function App() {
             </fieldset>
             <label className="field grow">
               <span>{loanKind === 'installment' ? 'What' : 'Who'}</span>
-              <input name="person" type="text" placeholder={loanKind === 'installment' ? 'Phone' : 'Maya'} maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+              <input name="person" type="text" maxLength={NAME_MAX} required autoFocus onInput={textLock} />
             </label>
             <label className="field amount">
               <span>{loanKind === 'installment' ? 'Total' : 'Amount'}</span>
-              <input name="amount" type="text" inputMode="decimal" placeholder={loanKind === 'installment' ? '6000' : '12.00'} autoComplete="off" required onInput={clearValidity} />
+              <input name="amount" type="text" inputMode="decimal" autoComplete="off" required onInput={numericLock} />
             </label>
             <label className="field">
               <span>Since</span>
@@ -5128,18 +5195,8 @@ export default function App() {
             {loanOrigin === 'existing' && (
               <label className="field amount">
                 <span>Already paid</span>
-                <input name="paidBefore" type="text" inputMode="decimal" placeholder="Optional" autoComplete="off" onInput={clearValidity} />
+                <input name="paidBefore" type="text" inputMode="decimal" placeholder="Optional" autoComplete="off" onInput={numericLock} />
               </label>
-            )}
-            {loanKind === 'installment' && loanOrigin === 'new' && (
-              <p className="hint grow-full">
-                An installment adds nothing to today. Each payment you record counts as spending on the day you pay it.
-              </p>
-            )}
-            {loanOrigin === 'existing' && (
-              <p className="hint grow-full">
-                Nothing is logged for what is already paid. Payments you record from now count on the day you pay them.
-              </p>
             )}
             <button type="submit" className="btn ink">Add</button>
           </form>
@@ -5190,13 +5247,13 @@ export default function App() {
                   maxLength={NAME_MAX}
                   required
                   autoFocus
-                  onInput={clearValidity}
+                  onInput={textLock}
                 />
               </label>
             )}
             <label className="field balance">
               <span>Starting balance</span>
-              <input name="balance" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" onInput={clearValidity} />
+              <input name="balance" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" onInput={numericLock} />
             </label>
             <button type="submit" className="btn ink">Add</button>
           </form>
@@ -5233,7 +5290,7 @@ export default function App() {
               <span>Amount</span>
               <div className="amount-wrap">
                 <span className="amount-sym">{sym}</span>
-                <input name="amount" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={clearValidity} />
+                <input name="amount" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={numericLock} />
               </div>
             </label>
             <div className="transfer-tail">
@@ -5255,13 +5312,13 @@ export default function App() {
           <form id="add-goal" onSubmit={handleAddGoal} className="add-form">
             <label className="field grow">
               <span>Goal</span>
-              <input name="name" type="text" placeholder="Laptop" maxLength={NAME_MAX} required autoFocus onInput={clearValidity} />
+              <input name="name" type="text" maxLength={NAME_MAX} required autoFocus onInput={textLock} />
             </label>
             <label className="field big-amount">
               <span>Target</span>
               <div className="amount-wrap">
                 <span className="amount-sym">{sym}</span>
-                <input name="target" type="text" inputMode="decimal" placeholder={zeroDecimal ? '20000' : '800.00'} autoComplete="off" required onInput={clearValidity} />
+                <input name="target" type="text" inputMode="decimal" autoComplete="off" required onInput={numericLock} />
               </div>
             </label>
             <div className="sheet-foot">
