@@ -4209,6 +4209,7 @@ button[aria-busy='true']:disabled {
 
 /* The sheet: the submit button stays in reach above the keyboard. */
 .sheet-foot {
+  width: 100%;
   position: sticky;
   bottom: 0;
   z-index: 1;
