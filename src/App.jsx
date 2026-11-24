@@ -3713,11 +3713,13 @@ export default function App() {
             <section className="card pad">
               <div className="card-title-row">
                 <h1>Subscriptions</h1>
-                <span className="num muted">{fmt(subsMonthly)} / month</span>
+                {data.subscriptions.length === 0 ? (
+                  <p className="card-empty">No subscriptions yet.</p>
+                ) : (
+                  <span className="num muted">{fmt(subsMonthly)} / month</span>
+                )}
               </div>
-              {data.subscriptions.length === 0 ? (
-                <p className="card-empty">No subscriptions yet.</p>
-              ) : (
+              {data.subscriptions.length > 0 && (
                 <ul className="card-list">
                   {data.subscriptions.map((sub) => {
                     const editingThis = rowEdit?.list === 'subscriptions' && rowEdit.id === sub.id;
@@ -3788,7 +3790,10 @@ export default function App() {
 
           {view === 'loans' && (
             <section className="card pad">
-              <h1>Loans</h1>
+              <div className="card-title-row">
+                <h1>Loans</h1>
+                {data.debts.length === 0 && <p className="card-empty">No loans.</p>}
+              </div>
               {data.debts.length > 0 && (
                 <dl className="math loans-math">
                   <div>
@@ -3821,7 +3826,7 @@ export default function App() {
                 </fieldset>
               )}
               {data.debts.length === 0 ? (
-                <p className="card-empty">No loans.</p>
+                null
               ) : shownLoans.length === 0 ? (
                 <p className="card-empty">No {loanFilter} loans.</p>
               ) : (
@@ -4071,7 +4076,10 @@ export default function App() {
 
           {view === 'accounts' && (
             <section className="card pad">
-              <h1>Accounts</h1>
+              <div className="card-title-row">
+                <h1>Accounts</h1>
+                {!hasAccounts && <p className="card-empty">No accounts yet.</p>}
+              </div>
               {accounts.length > 1 && (
 <dl className="math accounts-math">
                 <div>
@@ -4092,9 +4100,7 @@ export default function App() {
 )}
               </dl>
 )}
-              {!hasAccounts ? (
-                <p className="card-empty">No accounts yet.</p>
-              ) : (
+              {hasAccounts && (
                 <ul className="card-list">
                   {accounts.map((acc) => {
                     const editingThis = rowEdit?.list === 'accounts' && rowEdit.id === acc.id;
@@ -4204,13 +4210,14 @@ export default function App() {
                 </ul>
               )}
               <div className="transfers">
-                <h2>Transfers</h2>
-                {!hasAccounts ? (
-                  <p className="hint">No accounts yet.</p>
-                ) : (
-                  <>
-                    {transfersByWhen.length > 0 && (
-                      <ul className="card-list">
+                <div className="card-title-row">
+                  <h2>Transfers</h2>
+                  {(!hasAccounts || transfersByWhen.length === 0) && (
+                    <p className="card-empty">{hasAccounts ? 'No transfers yet.' : 'No accounts yet.'}</p>
+                  )}
+                </div>
+                {transfersByWhen.length > 0 && (
+                  <ul className="card-list">
                         {(transfersAll ? transfersByWhen : transfersByWhen.slice(0, TRANSFERS_SHOWN)).map((t) => {
                           const from = transferSide(t.fromId);
                           const to = transferSide(t.toId);
@@ -4263,11 +4270,8 @@ export default function App() {
                           );
                         })}
                       </ul>
-                    )}
-                    {transfersByWhen.length === 0 && (
-                      <p className="card-empty">No transfers yet.</p>
-                    )}
-                    {transfersByWhen.length > TRANSFERS_SHOWN && (
+                )}
+                {transfersByWhen.length > TRANSFERS_SHOWN && (
                       <button
                         type="button"
                         className="text-btn transfers-more"
@@ -4281,25 +4285,18 @@ export default function App() {
                       <ArrowLeftRight size={16} aria-hidden="true" />
                       Transfer money
                     </button>
-                    </>
-                )}
               </div>
               <div className="goals">
                 <div className="card-title-row">
                   <h2>Savings goals</h2>
-                  {data.goals.length > 0 && (
+                  {data.goals.length === 0 ? (
+                    <p className="card-empty">No savings goals yet.</p>
+                  ) : (
                     <span className="num muted">
                       {fmt(round2(data.goals.reduce((sum, g) => sum + goalProgress(g).saved, 0)))} set aside
                     </span>
                   )}
                 </div>
-                {data.goals.length === 0 && (
-                  <p className="card-empty">
-                    No savings goals yet.
-                    <br />
-                    An emergency cushion, a laptop, next term's tuition.
-                  </p>
-                )}
                 {data.goals.length > 0 && (
                   <ul className="card-list">
                     {data.goals.map((goal) => {
