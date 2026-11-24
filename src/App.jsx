@@ -2984,7 +2984,7 @@ export default function App() {
   const finishIntroSetup = (e) => {
     e.preventDefault();
     if (!(introMonthly > 0)) {
-      setIntroError('Enter your monthly allowance to continue.');
+      setIntroError('Enter your monthly allowance.');
       return;
     }
     if (introMonthly > AMOUNT_MAX) {
@@ -2992,7 +2992,7 @@ export default function App() {
       return;
     }
     if (!(introDaily > 0)) {
-      setIntroError('That allowance is too small to split across the days left. Try a bigger amount, or set it up in Settings.');
+      setIntroError('That allowance is too small to spread across the days left. Enter a bigger amount, or set it up in Settings.');
       return;
     }
     commitSettings({ currency: introCurrency, monthlyBudget: introMonthly, dailyBudget: introDaily });
@@ -3943,7 +3943,7 @@ export default function App() {
             <section className="card pad">
               <div className="card-title-row">
                 <h1>Loans</h1>
-                {data.debts.length === 0 && <p className="card-empty">No loans.</p>}
+                {data.debts.length === 0 && <p className="card-empty">No loans yet.</p>}
               </div>
               {data.debts.length > 0 && (
                 <dl className="math loans-math">
@@ -5415,7 +5415,7 @@ export default function App() {
         <form className="sheet-body" onSubmit={finishIntroSetup}>
           <div className="sheet-head">
             <h2 id="intro-title">
-              {introStep === 1 ? 'Welcome to stdynt' : introStep === 2 ? 'Set your allowance' : "You're set up"}
+              {introStep === 1 ? 'Welcome to stdynt!' : introStep === 2 ? 'Set your allowance' : "You're set up"}
             </h2>
             <button type="button" className="icon-btn" onClick={skipIntro} aria-label="Close setup">
               <X size={22} strokeWidth={2} />
@@ -5429,13 +5429,8 @@ export default function App() {
 
           {introStep === 1 && (
             <>
-              <p className="intro-lead">
-                stdynt turns your monthly allowance into one number: what you can spend today.
-              </p>
-              <p className="hint">
-                Anything you don't spend carries to tomorrow. Spend more, and the difference comes back as debt.
-              </p>
-              <p className="hint">Works offline, and everything stays on this phone.</p>
+              <p className="intro-lead">Works offline.</p>
+              <p className="hint">Data stays on this phone.</p>
               <div className="sheet-foot">
                 <button
                   type="button"
@@ -5445,7 +5440,7 @@ export default function App() {
                     setIntroError('');
                   }}
                 >
-                  Get started
+                  Set my allowance
                 </button>
                 <button type="button" className="text-btn" onClick={skipIntro}>
                   Set up later
@@ -5516,7 +5511,7 @@ export default function App() {
           {introStep === 3 && introSaved && (
             <>
               <p className="intro-lead">
-                That's your allowance spread across the days left this month. Spend less and it carries to tomorrow.
+                Here's your daily number for the rest of this month. Spend less and the rest carries to tomorrow.
               </p>
               <div className="well intro-well" style={{ '--level': '1' }}>
                 <span className="intro-label">You can spend today</span>
@@ -5531,7 +5526,7 @@ export default function App() {
                   Log my first expense
                 </button>
                 <button type="button" className="text-btn" onClick={() => leaveIntro(false)}>
-                  Start using stdynt
+                  Go to Today
                 </button>
               </div>
             </>
