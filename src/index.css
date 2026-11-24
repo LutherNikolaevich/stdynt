@@ -73,6 +73,8 @@
 html {
   background: var(--ground);
   -webkit-text-size-adjust: 100%;
+  /* Installed app: no pinch or double-tap zoom, but panning still scrolls. Safari ignores user-scalable=no, so main.jsx blocks its gesture events too. */
+  touch-action: pan-x pan-y;
   /* Installed app, local data: a pull-down at the top should not reload the page (Android).
      contain rather than none so the native edge bounce/glow stays. */
   overscroll-behavior-y: contain;
@@ -489,9 +491,9 @@ button[aria-busy='true']:disabled {
   display: block;
 }
 
-/* Sideways drags stir the liquid; vertical ones still scroll the page and a pinch still zooms. */
+/* Sideways drags stir the liquid; vertical ones still scroll the page. */
 .well.live {
-  touch-action: pan-y pinch-zoom;
+  touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
 }
 
