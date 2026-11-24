@@ -5429,8 +5429,6 @@ export default function App() {
 
           {introStep === 1 && (
             <>
-              <p className="intro-lead">Works offline.</p>
-              <p className="hint">Data stays on this phone.</p>
               <div className="sheet-foot">
                 <button
                   type="button"
