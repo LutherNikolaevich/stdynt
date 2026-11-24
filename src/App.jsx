@@ -54,6 +54,7 @@ import {
   foldDelta,
   uncountedReason,
   parseAmount,
+  suggestDaily,
   dueBillingDates,
   loanEntry,
   loanRemaining,
@@ -179,7 +180,15 @@ const makeDefaultState = () => ({
   debts: [],
   accounts: [],
   transfers: [],
-  prefs: { historySort: 'date', lastBackup: null, backupSnoozed: null, lastCategory: null, lastAccount: null, earlierOpen: null }
+  prefs: {
+    onboarded: false,
+    historySort: 'date',
+    lastBackup: null,
+    backupSnoozed: null,
+    lastCategory: null,
+    lastAccount: null,
+    earlierOpen: null
+  }
 });
 
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -333,12 +342,12 @@ const rejectField = (input, message) => {
   input.reportValidity();
 };
 const clearValidity = (e) => e.currentTarget.setCustomValidity('');
+const cleanMoneyInput = (v) => v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
 const numericLock = (e) => {
   clearValidity(e);
   const el = e.currentTarget;
-  const v = el.value;
-  const cleaned = v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
-  if (cleaned !== v) el.value = cleaned;
+  const cleaned = cleanMoneyInput(el.value);
+  if (cleaned !== el.value) el.value = cleaned;
 };
 const textLock = (e) => {
   clearValidity(e);
@@ -843,6 +852,7 @@ const loadInitialData = () => {
     }
     const { clean, defaults } = readState(parsed, getLocalTodayStr());
     const { dropped, ...lists } = clean;
+    const savedPrefs = parsed.prefs && typeof parsed.prefs === 'object' ? parsed.prefs : {};
     if (dropped > 0) {
       try {
         localStorage.setItem(UNREADABLE_KEY, saved);
@@ -853,7 +863,8 @@ const loadInitialData = () => {
       state: {
         ...lists,
         categories: normalizeCategories(parsed.categories, lists.expenses),
-        prefs: { ...defaults.prefs, ...(parsed.prefs && typeof parsed.prefs === 'object' ? parsed.prefs : {}) }
+        // A save from before this flag existed belongs to someone already using the app.
+        prefs: { ...defaults.prefs, ...savedPrefs, onboarded: savedPrefs.onboarded !== false }
       },
       corrupted: false,
       dropped
@@ -2935,6 +2946,67 @@ export default function App() {
   }, [ask]);
   const closeAsk = () => askRef.current?.close();
 
+  const [introStep, setIntroStep] = useState(1);
+  const [introCurrency, setIntroCurrency] = useState('$');
+  const [introAmount, setIntroAmount] = useState('');
+  const [introError, setIntroError] = useState('');
+  const [introSaved, setIntroSaved] = useState(null);
+  const introRef = useRef(null);
+  const firstRun =
+    !data.prefs.onboarded &&
+    !storageCorrupted &&
+    view === 'today' &&
+    !(data.settings.monthlyBudget > 0) &&
+    !(data.settings.dailyBudget > 0) &&
+    data.expenses.length + data.income.length === 0;
+
+  useEffect(() => {
+    if (!firstRun || introRef.current?.open || sheetRef.current?.open || askRef.current?.open) return;
+    setIntroStep(1);
+    setIntroAmount('');
+    setIntroError('');
+    setIntroSaved(null);
+    setIntroCurrency(data.settings.currency || '$');
+    introRef.current?.showModal();
+    requestAnimationFrame(() => introRef.current?.querySelector('.btn.ink')?.focus());
+  }, [firstRun, data.settings.currency]);
+
+  const skipIntro = () => {
+    setData((d) => ({ ...d, prefs: { ...d.prefs, onboarded: true } }));
+    introRef.current?.close();
+  };
+
+  const introZero = ZERO_DECIMAL_CURRENCIES.has(introCurrency);
+  const introMonthly = parseAmount(introAmount, introZero);
+  const introDaily = suggestDaily(introMonthly, daysLeftInPeriod, introZero);
+  const introMoney = (n, currency = introCurrency) => `${currency}${formatNumber(n, currency)}`;
+
+  const finishIntroSetup = (e) => {
+    e.preventDefault();
+    if (!(introMonthly > 0)) {
+      setIntroError('Enter your monthly allowance to continue.');
+      return;
+    }
+    if (introMonthly > AMOUNT_MAX) {
+      setIntroError(`That's too much to track. The most is ${AMOUNT_MAX.toLocaleString('en-US')}.`);
+      return;
+    }
+    if (!(introDaily > 0)) {
+      setIntroError('That allowance is too small to split across the days left. Try a bigger amount, or set it up in Settings.');
+      return;
+    }
+    commitSettings({ currency: introCurrency, monthlyBudget: introMonthly, dailyBudget: introDaily });
+    setData((d) => ({ ...d, prefs: { ...d.prefs, onboarded: true } }));
+    setIntroSaved({ currency: introCurrency, daily: introDaily });
+    setIntroError('');
+    setIntroStep(3);
+  };
+
+  const leaveIntro = (logFirst) => {
+    introRef.current?.close();
+    if (logFirst) openSheet();
+  };
+
   const BACKUP_MAX_BYTES = 5 * 1024 * 1024;
 
   const importJSON = (e) => {
@@ -2970,7 +3042,7 @@ export default function App() {
         setData((d) => ({
           ...lists,
           categories: normalizeCategories(parsed.categories, lists.expenses),
-          prefs: d.prefs
+          prefs: { ...d.prefs, onboarded: true }
         }));
         setSettingsFormKey((k) => k + 1);
         setStampKey((k) => k + 1);
@@ -5327,6 +5399,144 @@ export default function App() {
           </form>
         )}
         </div>
+      </dialog>
+
+      {}
+      <dialog
+        ref={introRef}
+        className="sheet intro"
+        aria-labelledby="intro-title"
+        onCancel={(e) => {
+          e.preventDefault();
+          skipIntro();
+        }}
+        onClick={(e) => e.target === introRef.current && skipIntro()}
+      >
+        <form className="sheet-body" onSubmit={finishIntroSetup}>
+          <div className="sheet-head">
+            <h2 id="intro-title">
+              {introStep === 1 ? 'Welcome to stdynt' : introStep === 2 ? 'Set your allowance' : "You're set up"}
+            </h2>
+            <button type="button" className="icon-btn" onClick={skipIntro} aria-label="Close setup">
+              <X size={22} strokeWidth={2} />
+            </button>
+          </div>
+          <p className="sr-only" role="status">
+            {introStep === 3 && introSaved
+              ? `You can spend ${introMoney(introSaved.daily, introSaved.currency)} today.`
+              : ''}
+          </p>
+
+          {introStep === 1 && (
+            <>
+              <p className="intro-lead">
+                stdynt turns your monthly allowance into one number: what you can spend today.
+              </p>
+              <p className="hint">
+                Anything you don't spend carries to tomorrow. Spend more, and the difference comes back as debt.
+              </p>
+              <p className="hint">Works offline, and everything stays on this phone.</p>
+              <div className="sheet-foot">
+                <button
+                  type="button"
+                  className="btn ink full big"
+                  onClick={() => {
+                    setIntroStep(2);
+                    setIntroError('');
+                  }}
+                >
+                  Get started
+                </button>
+                <button type="button" className="text-btn" onClick={skipIntro}>
+                  Set up later
+                </button>
+              </div>
+            </>
+          )}
+
+          {introStep === 2 && (
+            <>
+              <label className="field">
+                <span>Currency</span>
+                <select value={introCurrency} onChange={(e) => setIntroCurrency(e.target.value)}>
+                  {[...new Set([...CURRENCIES.map((c) => c.symbol), introCurrency])].map((s) => {
+                    const c = CURRENCIES.find((x) => x.symbol === s);
+                    return (
+                      <option key={s} value={s}>
+                        {c ? `${s}  ${c.label}` : s}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              <label className="field">
+                <span>Monthly allowance</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={introAmount}
+                  onChange={(e) => {
+                    setIntroAmount(cleanMoneyInput(e.target.value));
+                    setIntroError('');
+                  }}
+                  placeholder="e.g. 600"
+                  autoFocus
+                  aria-describedby="intro-daily"
+                />
+              </label>
+              <p id="intro-daily" className="hint">
+                {introDaily > 0
+                  ? `That's about ${introMoney(introDaily)} a day until ${periodLastDay}.`
+                  : 'Enter your allowance to see your daily number.'}
+              </p>
+              {introError && (
+                <p className="hint intro-error" role="alert">
+                  {introError}
+                </p>
+              )}
+              <div className="sheet-foot">
+                <button type="submit" className="btn ink full big">
+                  See my daily number
+                </button>
+                <button
+                  type="button"
+                  className="text-btn"
+                  onClick={() => {
+                    setIntroStep(1);
+                    setIntroError('');
+                  }}
+                >
+                  Back
+                </button>
+              </div>
+            </>
+          )}
+
+          {introStep === 3 && introSaved && (
+            <>
+              <p className="intro-lead">
+                That's your allowance spread across the days left this month. Spend less and it carries to tomorrow.
+              </p>
+              <div className="well intro-well" style={{ '--level': '1' }}>
+                <span className="intro-label">You can spend today</span>
+                <span className="stamp">
+                  <span className="stamp-sym" aria-hidden="true">{introSaved.currency}</span>
+                  {formatNumber(introSaved.daily, introSaved.currency)}
+                </span>
+                <span className="date-stamp" aria-hidden="true">{stampDate(todayStr)}</span>
+              </div>
+              <div className="sheet-foot">
+                <button type="button" className="btn ink full big" autoFocus onClick={() => leaveIntro(true)}>
+                  Log my first expense
+                </button>
+                <button type="button" className="text-btn" onClick={() => leaveIntro(false)}>
+                  Start using stdynt
+                </button>
+              </div>
+            </>
+          )}
+        </form>
       </dialog>
 
       {}
