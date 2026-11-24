@@ -26,8 +26,6 @@ const contentSecurityPolicy = () => ({
   ]
 });
 
-// Writes the list of built files, and a hash of their contents, into dist/sw.js.
-// Any change to any file changes sw.js, which is what tells installed apps to update.
 const precacheManifest = () => {
   let outDir = 'dist';
   const walk = (dir) =>
@@ -44,7 +42,6 @@ const precacheManifest = () => {
       const swPath = join(outDir, 'sw.js');
       const hash = createHash('sha256');
       const urls = walk(outDir)
-        // Launch images are only read by iOS at install time; storing 12 of them offline is waste.
         .filter((file) => file !== swPath && !file.endsWith('.map') && !file.startsWith(join(outDir, 'splash')))
         .sort()
         .map((file) => {
@@ -62,8 +59,6 @@ const precacheManifest = () => {
   };
 };
 
-// The font is only discovered after the stylesheet is parsed. Preloading the Latin subset
-// lets it download alongside the CSS and JS, so first paint does not swap fonts late.
 const preloadFont = () => ({
   name: 'stdynt-preload-font',
   apply: 'build',
