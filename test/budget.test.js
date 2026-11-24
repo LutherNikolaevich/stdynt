@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeBudget, foldDelta, cashOnlyBaseFix } from '../src/budget.js';
+import { computeBudget, foldDelta, cashOnlyBaseFix, suggestDaily } from '../src/budget.js';
 import { sanitizeData } from '../src/sanitize.js';
 
 const todayStr = '2026-11-23';
@@ -118,4 +118,13 @@ test('cash<->account transfers leave today and carry unchanged', () => {
   assert.equal(b.earnedToday, 0);
   assert.deepEqual(b.dayRows.map((r) => r.carried), [300, 200, 100]);
   assert.ok(b.dayRows.every((r) => !('moved' in r)));
+});
+
+test('suggestDaily spreads an allowance over the days left, in whole money', () => {
+  assert.equal(suggestDaily(600, 30), 20);
+  assert.equal(suggestDaily(100, 3), 33.33);
+  assert.equal(suggestDaily(1000, 3, true), 333);
+  assert.equal(suggestDaily(0, 30), 0);
+  assert.equal(suggestDaily(600, 0), 0);
+  assert.equal(suggestDaily(-10, 3), 0);
 });
