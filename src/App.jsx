@@ -348,6 +348,12 @@ const numericLock = (e) => {
   const el = e.currentTarget;
   const cleaned = cleanMoneyInput(el.value);
   if (cleaned !== el.value) el.value = cleaned;
+const numericLock = (e) => {
+  clearValidity(e);
+  const el = e.currentTarget;
+  const v = el.value;
+  const cleaned = v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  if (cleaned !== v) el.value = cleaned;
 };
 const textLock = (e) => {
   clearValidity(e);
