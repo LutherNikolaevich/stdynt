@@ -413,6 +413,18 @@ button[aria-busy='true']:disabled {
   color: var(--text-2);
 }
 
+.card-title-row > .card-empty {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 0.9375rem;
+}
+
+.card-title-row:has(> .card-empty) > h1,
+.card-title-row:has(> .card-empty) > h2 {
+  font-size: 1.25rem;
+}
+
 
 .today {
   position: relative;
@@ -2146,10 +2158,6 @@ button[aria-busy='true']:disabled {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1.5px solid var(--panel-line);
-}
-
-.transfers > .hint {
-  margin-top: 8px;
 }
 
 .transfers .card-list {
