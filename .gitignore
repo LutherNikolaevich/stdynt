@@ -1,6 +1,8 @@
 node_modules/
 dist/
 docs/
+.opencode/
+.superpowers/
 
 .DS_Store
 *.md
