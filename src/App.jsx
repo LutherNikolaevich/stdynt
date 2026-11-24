@@ -413,8 +413,6 @@ const buzz = (ms = 8) => {
   }
 };
 
-// Chromium fires this once the app can be installed. Kept at module level because it can
-// arrive before React mounts. The browser's own install offer is left alone.
 let installPrompt = null;
 const installWatchers = new Set();
 const setInstallPrompt = (e) => {
@@ -429,10 +427,7 @@ export const announceNewBuild = () => {
 };
 window.addEventListener('beforeinstallprompt', setInstallPrompt);
 window.addEventListener('appinstalled', () => setInstallPrompt(null));
-// iOS has no install prompt. navigator.standalone only exists there: false means
-// "in Safari, not on the home screen", which is when the manual steps are worth showing.
 const IOS_NOT_INSTALLED = navigator.standalone === false;
-// Its own key, not part of the saved data: it is about this browser, and must not travel in a backup.
 const INSTALL_HINT_KEY = 'stdynt_install_hint_off';
 const readInstallHintOff = () => {
   try {
@@ -447,14 +442,9 @@ const isPhoneLayout = () => typeof window !== 'undefined' && window.matchMedia?.
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-// The well's level as a liquid you can touch. A tap dents the surface where the finger
-// lands; dragging sideways stirs it along the path. Under reduced motion the canvas
-// never takes over, and the flat CSS level (.well::before and ::after) stays.
 const TAP_STRENGTH = 0.9;
 const DRAG_STRENGTH = 6;
 
-// The surface never rises past this many pixels above the resting line at full level,
-// so a hard stir stays inside the gap under the label and date.
 const MAX_RISE = 12;
 
 const LiquidWell = ({ level }) => {
@@ -468,7 +458,6 @@ const LiquidWell = ({ level }) => {
     wakeRef.current?.();
   }, [level]);
 
-  // The setting can change while the app is open: follow it, both ways.
   useEffect(() => {
     const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     if (!query) return;
@@ -557,14 +546,12 @@ const LiquidWell = ({ level }) => {
     const onDown = (e) => {
       if (e.button > 0) return;
       dragX = across(e);
-      // Text stays selectable until a stir starts, so the figure can still be copied.
       well.classList.add('stirring');
       pokeLiquid(liquid, dragX, TAP_STRENGTH);
       wake();
     };
 
     const onMove = (e) => {
-      // A mouse stirs while it is held; a finger is always held while it moves.
       if (dragX === null) return;
       const x = across(e);
       pokeLiquid(liquid, x, Math.min(0.5, Math.abs(x - dragX) * DRAG_STRENGTH));
@@ -707,8 +694,6 @@ const MONEY_TIERS = 3;
 const shortNumber = (num, currencySymbol, tier) => {
   const n = Math.abs(Number(num || 0));
   if (tier <= 0) return formatNumber(n, currencySymbol);
-  // Under a thousand there is no short form, so the cents go. From there up the
-  // figure turns into 11.38M, which nobody can mistake for the exact amount.
   if (n < 1000) return Math.round(n).toLocaleString('en-US');
   return new Intl.NumberFormat('en-US', {
     notation: 'compact',
@@ -716,9 +701,6 @@ const shortNumber = (num, currencySymbol, tier) => {
   }).format(n);
 };
 
-// Shows exact amounts when they fit the box, and rounds them off when they would be cut.
-// Each part is { value, sign, className }. sign: 'neg' marks only negatives, 'both' always
-// shows + or −, '+' forces a plus. All parts shorten together.
 function MoneyFit({ parts, sym, className = '' }) {
   const ref = useRef(null);
   const [width, setWidth] = useState(0);
@@ -863,7 +845,6 @@ const loadInitialData = () => {
       state: {
         ...lists,
         categories: normalizeCategories(parsed.categories, lists.expenses),
-        // A save from before this flag existed belongs to someone already using the app.
         prefs: { ...defaults.prefs, ...savedPrefs, onboarded: savedPrefs.onboarded !== false }
       },
       corrupted: false,
@@ -1235,10 +1216,7 @@ export default function App() {
   const accounts = data.accounts;
   const hasAccounts = accounts.length > 0;
   const accountOf = (id) => (has(id) ? accounts.find((a) => a.id === id) : undefined);
-  // What a row says it was paid from. "Cash" is what the pickers call no account, so a row
-  // saved that way says so too. With no accounts set up there is nothing to tell apart.
   const accountLabel = (id) => accountOf(id)?.name || (hasAccounts ? 'Cash' : undefined);
-  // A transfer side of null is cash.
   const transferSide = (id) => (id === null ? 'Cash' : accountOf(id)?.name || 'Removed account');
   const balances = useMemo(
     () =>
@@ -1561,7 +1539,6 @@ export default function App() {
       if (accountRow) {
         accountRow.scrollLeft = Math.max(0, pickedAccount.offsetLeft - (accountRow.clientWidth - pickedAccount.offsetWidth) / 2);
       }
-      // A previous session can leave the recents row half-scrolled.
       const recentRow = sheetRef.current?.querySelector('.recent-row');
       if (recentRow) recentRow.scrollLeft = 0;
       amountInputRef.current?.focus();
@@ -2228,7 +2205,6 @@ export default function App() {
     commitLoan({
       before: null,
       after: debt,
-      // An item bought on installment brings in no cash, so nothing is logged until a payment is.
       steps: isItem || existing ? [] : [loanStep(debt, null, id + 1)],
       message: existing
         ? `Added ${person}${alreadyPaid}, nothing logged.${planned}`
@@ -2245,7 +2221,6 @@ export default function App() {
     closeAddSheet();
   };
 
-  // Reads the plan inputs. null means the loan has no plan; undefined means a field was rejected.
   const readPlan = (form, amount, prev = null) => {
     const input = form.elements.count;
     if (!input) return null;
@@ -2272,7 +2247,6 @@ export default function App() {
         rejectField(eachInput, 'One payment cannot be more than the total.');
         return undefined;
       }
-      // An untouched even split follows the total and the number of payments when those change.
       const old = prev?.installment;
       if (old && each === old.amount && old.amount === planEach(prev.amount, old.count, zeroDecimal)) each = even;
     }
@@ -2373,7 +2347,6 @@ export default function App() {
     const steps = [];
     if (found) {
       const [kind, entry] = found;
-      // The log entry keeps a note the user rewrote there; one we wrote follows the payment.
       const ours = entry.note === loanEntry(debt, payment).note;
       steps.push([kind, entry, { ...entry, amount: next.amount, date: next.date, ...(ours ? { note: loanEntry(after, next).note } : {}) }]);
     }

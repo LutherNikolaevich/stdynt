@@ -1,12 +1,10 @@
-// The well's liquid surface: a row of columns, each sprung back toward level and
-// coupled to its neighbours. Heights are fractions of the well's width.
 
-const STIFFNESS = 60; // pull back toward level
-const COUPLING = 150; // pull toward neighbouring columns, which makes ripples travel
+const STIFFNESS = 60;
+const COUPLING = 150;
 const DAMPING = 3.5;
 const SUBSTEP = 1 / 120;
 const MAX_FRAME = 1 / 30;
-const POKE_WIDTH = 0.06; // how wide a fingertip's dent is, as a fraction of the width
+const POKE_WIDTH = 0.06;
 
 export const createLiquid = (n = 40) => ({
   n,
@@ -42,8 +40,6 @@ export const stepLiquid = (state, dt) => {
   }
 };
 
-// Pushes the surface down around x (0 at the left edge, 1 at the right).
-// strength is the downward speed given to the column under the finger, in widths per second.
 export const pokeLiquid = (state, x, strength) => {
   if (!Number.isFinite(x) || !Number.isFinite(strength)) return;
   const { n, v } = state;

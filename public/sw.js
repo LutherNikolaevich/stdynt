@@ -1,6 +1,3 @@
-// Offline-first: every file of a build is stored at install, then served from that copy.
-// The network is only used to fetch the next build, never to open the app.
-// VERSION and PRECACHE are filled in at build time (see precacheManifest in vite.config.js).
 const VERSION = '__VERSION__';
 const PRECACHE = [/*__PRECACHE__*/];
 const CACHE_NAME = `stdynt-${VERSION}`;
@@ -11,8 +8,6 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches
       .open(CACHE_NAME)
-      // cache: 'reload' skips the HTTP cache, so a build is never assembled from stale files.
-      // addAll is all-or-nothing: a failed download leaves the previous build in charge.
       .then((cache) => cache.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
@@ -27,7 +22,6 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// A response that arrived through a redirect cannot answer a navigation; rebuild it clean.
 const clean = (res) =>
   res.redirected ? new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers }) : res;
 
