@@ -4507,3 +4507,36 @@ button[aria-busy='true']:disabled {
 .goals > .hint {
   margin-top: 8px;
 }
+
+/* First run: welcome, allowance, then today's number. */
+.intro-lead {
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+
+.intro .sheet-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.intro .text-btn {
+  justify-content: center;
+}
+
+.intro-error {
+  color: var(--red);
+}
+
+.intro-well {
+  min-height: 210px;
+}
+
+.intro-well .stamp {
+  font-size: clamp(2.75rem, 16cqi, 4.5rem);
+}
+
+.intro-label {
+  font-weight: 600;
+}
