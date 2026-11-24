@@ -885,7 +885,6 @@ export default function App() {
   const sheetRef = useRef(null);
   const amountInputRef = useRef(null);
   const dragRef = useRef(null);
-  const [fabCompact, setFabCompact] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [todayStr, setTodayStr] = useState(getLocalTodayStr);
   const [historyPages, setHistoryPages] = useState(1);
@@ -949,9 +948,6 @@ export default function App() {
         const max = document.documentElement.scrollHeight - window.innerHeight;
         const y = Math.min(Math.max(0, window.scrollY), max);
         setScrolled(y > 4);
-        if (y < 80) setFabCompact(false);
-        else if (y > lastY + 6) setFabCompact(true);
-        else if (y < lastY - 6) setFabCompact(false);
         lastY = y;
         ticking = false;
       });
@@ -1114,7 +1110,6 @@ export default function App() {
 
   useEffect(() => {
     if (view !== 'settings') lastMoneyViewRef.current = view;
-    setFabCompact(false);
   }, [view]);
 
   useEffect(() => {
@@ -3161,13 +3156,12 @@ export default function App() {
       <div className="rail">
         {fabTarget && (
           <button
-            className={`fab ${fabCompact ? 'compact' : ''}`}
+            className="fab compact"
             onClick={() => (view === 'today' ? openSheet() : openAddSheet())}
             aria-label={fabTarget[1]}
             aria-keyshortcuts="N"
           >
             <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
-            <span className="fab-label">{fabTarget[1]}</span>
             <kbd className="nav-kbd" aria-hidden="true">N</kbd>
           </button>
         )}
