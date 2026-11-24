@@ -863,7 +863,6 @@ const loadInitialData = () => {
       state: {
         ...lists,
         categories: normalizeCategories(parsed.categories, lists.expenses),
-        // A save from before this flag existed belongs to someone already using the app.
         prefs: { ...defaults.prefs, ...savedPrefs, onboarded: savedPrefs.onboarded !== false }
       },
       corrupted: false,
