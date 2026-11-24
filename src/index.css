@@ -2286,6 +2286,56 @@ button[aria-busy='true']:disabled {
   transition-duration: 0.08s;
 }
 
+.fab-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.fab-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  padding: 0 18px 0 16px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--ground);
+  font-weight: 700;
+  font-size: 1rem;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    inset 0 -2px 3px rgb(23 45 36 / 0.1),
+    var(--shadow-float);
+  animation: dock-in 0.5s var(--spring) both;
+}
+
+.fab-action:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.fab-action:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .fab-action:hover {
+    background: color-mix(in srgb, var(--text) 86%, var(--sun));
+  }
+}
+
+@media (max-width: 999px) {
+  .fab-actions {
+    position: fixed;
+    left: calc(100% - 16px);
+    translate: -100% 0;
+    bottom: calc(var(--nav-h) + 16px + var(--safe-b) + 72px);
+    z-index: 20;
+  }
+}
+
 @media (max-width: 999px) {
   .fab {
     transition: background-color 0.2s ease, scale 0.4s var(--spring), box-shadow 0.2s ease,
@@ -3432,12 +3482,6 @@ button[aria-busy='true']:disabled {
   gap: 10px;
   flex-basis: 100%;
   padding: 4px 0 14px;
-}
-
-.sub-mode {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1.5px solid var(--panel-line);
 }
 
 .confirm {
