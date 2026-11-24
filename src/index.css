@@ -3029,7 +3029,7 @@ button[aria-busy='true']:disabled {
 }
 
 .recent-pick > span {
-  line-height: 41px;
+  line-height: 45px;
 }
 
 .recent-what {

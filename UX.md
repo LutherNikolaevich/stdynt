@@ -25,7 +25,7 @@ How stdynt applies Fitts's law, Hick's law, Jakob's law, and Miller's law, delib
 - **A bottom tab bar with exactly 5 items.** Today, Categories, Subs, Loans, Accounts (`MONEY_VIEWS`, `App.jsx:360-366`); Settings through the topbar cog. The count matches the 5-item convention.
 - **Real navigation.** Views are `<a href="#/...">` hash routes with `aria-current="page"` (`App.jsx:3178`); browser back works, including a `popstate` handler for the sheet and history state (`App.jsx:1100-1149`). Settings' Back calls `history.back()` (`App.jsx:1100`).
 - **Native controls, native dialogs.** The sheet and confirms are `<dialog>`; forms are real `button`, `input`, `select`, radio chips (`DESIGN.md` "Rules"). The share sheet is native `navigator.share` (`App.jsx:2879`).
-- **The system respects its settings.** Five `prefers-reduced-motion` gates (`App.jsx:423`, `:448`; `index.css:1290`, `:3870`, `:4463`, and the `no-preference` wrappers), a dark-only `color-scheme` (`index.css:66`), safe-area insets (`--safe-b`), and `interactive-widget=resizes-content`.
+- **The system respects its settings.** Reduced motion is gated in `App.jsx` (`:423`, `:448`) and behind `prefers-reduced-motion` blocks across `index.css`; a dark-only `color-scheme` (`index.css:64`), safe-area insets (`--safe-b`), and `interactive-widget=resizes-content` (`index.html:5`).
 - **Documented deviations.** Dark only: an owner identity decision recorded in `DESIGN.md` ("Theme"), not an oversight. Pull to refresh is off (`overscroll-behavior-y: contain`, `index.css:78`) on purpose: data is local and nothing ever refreshes from a network, so the gesture has nothing to do.
 
 ## 4. Miller's law: chunks with doors to the rest
@@ -33,7 +33,7 @@ How stdynt applies Fitts's law, Hick's law, Jakob's law, and Miller's law, delib
 - **Navigation is one chunk of 5.** See above.
 - **The past folds away.** Today shows the last 7 days, then a fold for the rest (`App.jsx:3367`). History pages 10 days and 20 rows at a time (`HISTORY_DAYS_STEP`/`HISTORY_ROWS_STEP`, `App.jsx:654-655`), so the cap is a door, not a truncation.
 - **Recents stop at 4.** The sheet's Recent row shows up to four past entries (`DESIGN.md` "Sheet extras").
-- **The legend stops at 12.** The donut legend caps at 12 slices and labels (`App.jsx:3613`).
+- **The legend stays tied to the donut.** The legend renders the same entries as the donut (`App.jsx:3628`), and the donut's centre label truncates to 12 characters (`pieShown.slice(0, 12)`, `App.jsx:3613`), so the chunk size is capped even when categories grow.
 - **Context is carried forward.** Editing opens the sheet prefilled; the last category is remembered in `prefs.lastCategory` (`App.jsx:181`, applied at `:1522`) and the note field suggests past notes through a native datalist.
 - **Recognition over recall.** Install shortcuts open Log expense, Accounts, and Loans directly (manifest); the budget line states in plain words what the number means ("$X a day lasts until [date]", `App.jsx:3260`).
 
@@ -167,7 +167,7 @@ Contrast measured (WCAG, all pass AA for normal text):
 - [ ] Live messages in always-mounted `role="status"` regions (`DESIGN.md` "Rules").
 - [ ] History search labelled for screen readers; icons `aria-hidden` beside a visible or `aria-label` name.
 - [ ] `lang="en"` in `index.html`; tabular figures for money.
-- [ ] Reduced motion respected (five gates, `App.jsx`/`index.css`); reduced transparency and dark `color-scheme` set.
+- [ ] Reduced motion respected (`App.jsx:423`, `:448`; `prefers-reduced-motion` blocks across `index.css`); reduced transparency and dark `color-scheme` set.
 - [ ] 48x48px tap targets; 56px main actions.
 - [ ] Keyboard: native controls and native `<dialog>`, so Tab, Enter, and Escape work without script.
 
