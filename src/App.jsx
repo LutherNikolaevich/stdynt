@@ -367,6 +367,7 @@ const MONEY_VIEWS = [
 
 const VIEWS = [...MONEY_VIEWS.map((v) => v.id), 'settings'];
 const ADD_FORMS = {
+  today: ['expense', 'Log expense'],
   subs: ['add-subs', 'Add subscription'],
   loans: ['add-loans', 'Add loan'],
   accounts: ['add-accounts', 'Add account']
@@ -1179,9 +1180,9 @@ export default function App() {
       } else if (e.key === 'Escape' && viewRef.current === 'settings') {
         e.preventDefault();
         leaveSettings();
-      } else if ((e.key === 'n' || e.key === 'N') && !e.shiftKey && viewRef.current !== 'settings') {
+      } else if ((e.key === 'n' || e.key === 'N') && !e.shiftKey && ADD_FORMS[viewRef.current]) {
         e.preventDefault();
-        primaryAdd();
+        viewRef.current === 'today' ? openSheet() : openAddSheet();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -3120,7 +3121,6 @@ export default function App() {
   const accountSplit =
     accounts.length > 2 && accounts.some((a) => a.type === 'ewallet') && accounts.some((a) => a.type !== 'ewallet');
   const fabTarget = ADD_FORMS[view];
-  const primaryAdd = () => (ADD_FORMS[viewRef.current] ? openAddSheet() : openSheet());
 
   return (
     <div className={`app view-${view}`}>
@@ -3159,16 +3159,18 @@ export default function App() {
 
       {}
       <div className="rail">
-        <button
-          className={`fab ${fabCompact ? 'compact' : ''}`}
-          onClick={primaryAdd}
-          aria-label={fabTarget ? fabTarget[1] : 'Log expense'}
-          aria-keyshortcuts="N"
-        >
-          <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
-          <span className="fab-label">{fabTarget ? fabTarget[1] : 'Log expense'}</span>
-          <kbd className="nav-kbd" aria-hidden="true">N</kbd>
-        </button>
+        {fabTarget && (
+          <button
+            className={`fab ${fabCompact ? 'compact' : ''}`}
+            onClick={() => (view === 'today' ? openSheet() : openAddSheet())}
+            aria-label={fabTarget[1]}
+            aria-keyshortcuts="N"
+          >
+            <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
+            <span className="fab-label">{fabTarget[1]}</span>
+            <kbd className="nav-kbd" aria-hidden="true">N</kbd>
+          </button>
+        )}
         <nav className="bottom-nav" aria-label="Money">
           {MONEY_VIEWS.map(({ id, label, Icon }, i) => (
             <a
