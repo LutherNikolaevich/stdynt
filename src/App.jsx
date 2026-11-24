@@ -4210,7 +4210,7 @@ export default function App() {
               <div className="transfers">
                 <h2>Transfers</h2>
                 {!hasAccounts ? (
-                  <p className="hint">Add an account to move money in or out of it.</p>
+                  <p className="hint">No accounts yet.</p>
                 ) : (
                   <>
                     {transfersByWhen.length > 0 && (
@@ -4269,7 +4269,7 @@ export default function App() {
                       </ul>
                     )}
                     {transfersByWhen.length === 0 && (
-                      <p className="card-empty">No transfers yet. Move money between your accounts, or top one up from cash.</p>
+                      <p className="card-empty">No transfers yet.</p>
                     )}
                     {transfersByWhen.length > TRANSFERS_SHOWN && (
                       <button
@@ -4301,7 +4301,7 @@ export default function App() {
                   <p className="card-empty">
                     No savings goals yet.
                     <br />
-                    An emergency cushion, a laptop, next term's tuition — set a target and watch it fill.
+                    An emergency cushion, a laptop, next term's tuition.
                   </p>
                 )}
                 {data.goals.length > 0 && (
@@ -4838,7 +4838,13 @@ export default function App() {
           >
             <span className="sheet-grip" aria-hidden="true" />
             <h2>
-              {editing ? `Edit ${sheetKind === 'income' ? 'income' : 'expense'}` : 'New entry'}
+              {editing
+                ? editing.note?.trim()
+                  ? `Edit · ${editing.note.trim()}`
+                  : `Edit ${sheetKind === 'income' ? 'income' : 'expense'}`
+                : sheetKind === 'income'
+                  ? 'New income'
+                  : 'New expense'}
             </h2>
             <button type="button" className="icon-btn" onClick={() => closeSheet()} aria-label="Close">
               <X size={22} strokeWidth={2} />
