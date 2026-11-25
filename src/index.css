@@ -83,8 +83,12 @@
   --spring: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001 85.9%, 1);
   --spring-soft: linear(0, 0.034 3.4%, 0.13 7.4%, 0.469 18.4%, 0.672 26.5%, 0.818 34.5%, 0.912 42.4%, 0.968 50.6%, 0.998 59.6%, 1.01 69.2%, 1.006 84%, 1);
 
-  --dur-enter: 0.42s;
-  --dur-exit: 0.2s;
+  --dur-tap: 90ms;
+  --dur-ui: 180ms;
+  --dur-move: 320ms;
+  --dur-enter: 460ms;
+  --dur-exit: 200ms;
+  --ease-paper: cubic-bezier(0.22, 0.9, 0.24, 1);
   --rise: 8px;
 
   --nav-h: 72px;
@@ -349,7 +353,7 @@ button[aria-busy='true']:disabled {
   margin-right: -12px;
   border-radius: 10px;
   color: var(--text);
-  transition: background-color 0.2s ease, transform 0.3s var(--spring), color 0.2s ease;
+  transition: background-color var(--dur-ui) ease, transform 0.3s var(--spring), color var(--dur-ui) ease;
 }
 
 .back-btn {
@@ -492,7 +496,6 @@ button[aria-busy='true']:disabled {
   background: linear-gradient(to top, rgb(216 196 154 / 0.08), rgb(216 196 154 / 0.24));
   transform-origin: bottom;
   transform: scaleY(var(--level, 0));
-  transition: transform 0.75s var(--ease-out);
   transition: transform 0.75s var(--spring-soft);
 }
 
@@ -510,7 +513,6 @@ button[aria-busy='true']:disabled {
     0 0 12px rgb(216 196 154 / 0.22),
     0 1px 0 rgb(246 241 228 / 0.3);
   opacity: calc(var(--level, 0) * 1000);
-  transition: bottom 0.75s var(--ease-out);
   transition: bottom 0.75s var(--spring-soft);
 }
 
@@ -626,14 +628,19 @@ button[aria-busy='true']:disabled {
   padding-bottom: 20px;
 }
 
-.stamp.pressed > span {
-  animation: press 0.5s var(--ease-out);
+.stamp.pressed {
+  animation: stamp-land 260ms var(--ease-out);
 }
 
-@keyframes press {
-  from {
-    transform: translateY(0.12em);
-    opacity: 0.35;
+@keyframes stamp-land {
+  0% {
+    transform: scale(1.045) rotate(-0.8deg);
+  }
+  55% {
+    transform: scale(0.985) rotate(0.15deg);
+  }
+  100% {
+    transform: none;
   }
 }
 
@@ -716,7 +723,7 @@ button[aria-busy='true']:disabled {
   padding-bottom: 0;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--dur-ui) ease;
 }
 
 .ledger-fold.ledger-sub {
@@ -738,7 +745,7 @@ button[aria-busy='true']:disabled {
 
 .fold-chev svg {
   transform: rotate(-90deg);
-  transition: transform 0.25s var(--ease-out);
+  transition: transform var(--dur-ui) var(--ease-out);
 }
 
 .ledger-fold.is-open .fold-chev svg {
@@ -755,7 +762,7 @@ button[aria-busy='true']:disabled {
   min-height: 48px;
   border-top: 1px solid var(--panel-line);
   font-size: 0.875rem;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--dur-ui) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -797,7 +804,7 @@ button[aria-busy='true']:disabled {
 
 .row-open {
   border-radius: 6px;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--dur-ui) ease;
 }
 
 .row-open:active {
@@ -875,7 +882,7 @@ button[aria-busy='true']:disabled {
   margin-right: -12px;
   border-radius: 8px;
   color: var(--text-2);
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.35s var(--spring);
+  transition: background-color var(--dur-ui) ease, color var(--dur-ui) ease, transform 0.35s var(--spring);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1007,8 +1014,7 @@ button[aria-busy='true']:disabled {
   font-weight: 600;
   box-shadow: inset 0 0 0 2px var(--warn);
   transform-origin: top center;
-  animation: slip-in 0.6s var(--ease-out);
-  animation: slip-in 0.6s var(--spring);
+  animation: slip-in var(--dur-enter) var(--spring);
 }
 
 @keyframes slip-in {
@@ -1099,7 +1105,7 @@ button[aria-busy='true']:disabled {
   color: var(--text-2);
   text-decoration: underline;
   text-underline-offset: 3px;
-  transition: color 0.2s ease, text-underline-offset 0.35s var(--spring);
+  transition: color var(--dur-ui) ease, text-underline-offset 0.35s var(--spring);
 }
 
 .text-btn:active {
@@ -1196,7 +1202,7 @@ button[aria-busy='true']:disabled {
   border-radius: 6px;
   text-align: left;
   color: var(--text);
-  transition: background-color 0.15s ease;
+  transition: background-color var(--dur-ui) ease;
 }
 
 .day-head:active {
@@ -1239,7 +1245,7 @@ button[aria-busy='true']:disabled {
   width: 34px;
   color: var(--text-2);
   transform: rotate(-90deg);
-  transition: transform 0.25s var(--ease-out);
+  transition: transform var(--dur-ui) var(--ease-out);
 }
 
 .history-day.is-open .day-chev {
@@ -1267,7 +1273,7 @@ button[aria-busy='true']:disabled {
   font-weight: 600;
   font-size: 0.875rem;
   color: var(--text-2);
-  transition: color 0.2s ease;
+  transition: color var(--dur-ui) ease;
 }
 
 .more-btn span {
@@ -1325,38 +1331,6 @@ button[aria-busy='true']:disabled {
   color: var(--text-2);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-@supports (animation-timeline: view()) {
-  .list-row {
-    opacity: 0;
-    transform: translateY(8px);
-    transform-origin: top center;
-    animation: file-in linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 80%;
-  }
-
-  .list-row.row-fresh,
-  .list-row.row-strike {
-    opacity: 1;
-    transform: none;
-    animation-timeline: auto;
-    animation-range: normal;
-  }
-
-  @keyframes file-in {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-}
-}
-
 .cat-layout {
   display: flex;
   flex-direction: column;
@@ -1386,8 +1360,7 @@ button[aria-busy='true']:disabled {
   outline: none;
   transform-box: view-box;
   transition: stroke-width 0.45s var(--spring), opacity 0.3s ease;
-  animation: slice-draw 0.9s var(--ease-out) both;
-  animation-delay: calc(var(--i) * 0.09s);
+  animation: slice-draw var(--dur-enter) var(--ease-paper) both;
 }
 
 @keyframes slice-draw {
@@ -1423,7 +1396,7 @@ button[aria-busy='true']:disabled {
 }
 
 .donut-center {
-  animation: center-ink 0.45s var(--ease-out) both;
+  animation: center-ink var(--dur-move) var(--ease-out) both;
 }
 
 @keyframes center-ink {
@@ -1468,10 +1441,25 @@ button[aria-busy='true']:disabled {
 }
 
 .legend li {
-  border-top: 1px solid var(--panel-line);
-  animation: legend-in 0.5s var(--ease-out) both;
-  animation-delay: calc(0.1s + var(--n, 0) * 0.07s);
+  position: relative;
+  padding-top: 1px;
+  animation: legend-in var(--dur-ui) ease both;
+  animation-delay: calc(var(--n, 0) * 40ms);
   transition: opacity 0.3s ease;
+}
+
+.legend li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: var(--panel-line);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: rule-draw var(--dur-enter) var(--ease-paper) forwards;
+  animation-delay: calc(var(--n, 0) * 40ms);
 }
 
 .legend li:nth-child(1) { --n: 0; }
@@ -1490,10 +1478,12 @@ button[aria-busy='true']:disabled {
 @keyframes legend-in {
   from {
     opacity: 0;
-    clip-path: inset(0 100% 0 0);
   }
+}
+
+@keyframes rule-draw {
   to {
-    clip-path: inset(0 0 0 0);
+    transform: scaleX(1);
   }
 }
 
@@ -1507,7 +1497,7 @@ button[aria-busy='true']:disabled {
   padding: 8px 6px;
   border-radius: 6px;
   text-align: left;
-  transition: background-color 0.2s ease;
+  transition: background-color var(--dur-ui) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1607,7 +1597,7 @@ button[aria-busy='true']:disabled {
   font-weight: 600;
   font-size: 0.9375rem;
   color: var(--text-2);
-  transition: background-color 0.2s, color 0.2s;
+  transition: background-color var(--dur-ui), color var(--dur-ui);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1665,7 +1655,7 @@ button[aria-busy='true']:disabled {
   color: var(--text-2);
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.2s, color 0.2s;
+  transition: background-color var(--dur-ui), color var(--dur-ui);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1757,7 +1747,7 @@ button[aria-busy='true']:disabled {
   background: transparent;
   color: var(--text);
   font-weight: 500;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition: border-color var(--dur-ui) ease, background-color var(--dur-ui) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1926,7 +1916,7 @@ button[aria-busy='true']:disabled {
   font-size: 0.9375rem;
   color: var(--text-2);
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
+  transition: background-color var(--dur-ui), color var(--dur-ui);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1958,12 +1948,12 @@ button[aria-busy='true']:disabled {
   font-weight: 700;
   font-size: 0.9375rem;
   cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.4s var(--spring), box-shadow 0.2s ease;
+  transition: background-color var(--dur-ui) ease, transform 0.4s var(--spring), box-shadow var(--dur-ui) ease;
 }
 
 .btn:active {
-  transform: scale(0.95);
-  transition-duration: 0.08s;
+  transform: translateY(1px) scale(0.985);
+  transition-duration: var(--dur-tap);
 }
 
 .btn.ink {
@@ -2070,7 +2060,7 @@ button[aria-busy='true']:disabled {
   color: var(--text);
   font-weight: 700;
   font-size: 0.875rem;
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.4s var(--spring);
+  transition: background-color var(--dur-ui) ease, color var(--dur-ui) ease, transform 0.4s var(--spring);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -2378,7 +2368,7 @@ button[aria-busy='true']:disabled {
 
 @media (max-width: 999px) {
   .fab {
-    transition: background-color 0.2s ease, scale 0.4s var(--spring), box-shadow 0.2s ease,
+    transition: background-color var(--dur-ui) ease, scale 0.4s var(--spring), box-shadow var(--dur-ui) ease,
       width 0.45s var(--spring-soft), left 0.45s var(--spring-soft), translate 0.45s var(--spring-soft),
       gap 0.3s ease;
     left: calc(100% - 16px);
@@ -2441,7 +2431,7 @@ button[aria-busy='true']:disabled {
   font-size: var(--text-label);
   font-weight: 600;
   color: var(--text-2);
-  transition: color 0.2s ease;
+  transition: color var(--dur-ui) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -2510,23 +2500,22 @@ button[aria-busy='true']:disabled {
 }
 
 .sheet[open] {
-  animation: sheet-in 0.55s var(--ease-out);
-  animation: sheet-in 0.55s var(--spring);
+  animation: sheet-in var(--dur-enter) var(--spring);
 }
 
 .sheet[open].closing {
-  animation: sheet-out 0.24s var(--ease-in) forwards;
+  animation: sheet-out var(--dur-exit) var(--ease-in) forwards;
 }
 
 .sheet::backdrop {
   background: rgb(8 18 14 / 0.55);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: backdrop-in 0.32s ease both;
+  animation: backdrop-in var(--dur-move) ease both;
 }
 
 .sheet.closing::backdrop {
-  animation: backdrop-out 0.24s ease forwards;
+  animation: backdrop-out var(--dur-exit) ease forwards;
 }
 
 @keyframes sheet-in {
@@ -2554,7 +2543,7 @@ button[aria-busy='true']:disabled {
 }
 
 .sheet[open]:not(.closing) .sheet-body > * {
-  animation: field-in 0.5s var(--ease-out) both;
+  animation: field-in var(--dur-enter) var(--ease-paper) both;
   animation-delay: calc(0.06s + var(--k, 0) * 0.04s);
 }
 
@@ -2720,7 +2709,7 @@ button[aria-busy='true']:disabled {
   text-decoration: underline;
   text-underline-offset: 3px;
   border-radius: 6px;
-  transition: background-color 0.2s ease, text-underline-offset 0.35s var(--spring);
+  transition: background-color var(--dur-ui) ease, text-underline-offset 0.35s var(--spring);
 }
 
 .legend-link:active {
@@ -2750,7 +2739,7 @@ button[aria-busy='true']:disabled {
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.4s var(--spring), box-shadow 0.18s ease;
+  transition: background-color var(--dur-ui) ease, border-color var(--dur-ui) ease, color var(--dur-ui) ease, transform 0.4s var(--spring), box-shadow var(--dur-ui) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -2769,7 +2758,7 @@ button[aria-busy='true']:disabled {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  transition: box-shadow 0.18s ease, transform 0.45s var(--spring);
+  transition: box-shadow var(--dur-ui) ease, transform 0.45s var(--spring);
 }
 
 .chip input:checked + span {
@@ -2813,7 +2802,7 @@ button[aria-busy='true']:disabled {
   color: var(--text);
   font-weight: 600;
   box-shadow: inset 0 1px 0 var(--rim), var(--shadow-float);
-  animation: toast-in 0.55s var(--spring), toast-out 0.25s var(--ease-in) 3.5s forwards;
+  animation: toast-in var(--dur-enter) var(--spring), toast-out var(--dur-exit) var(--ease-in) 3.5s forwards;
 }
 
 .toast.error {
@@ -2827,7 +2816,18 @@ button[aria-busy='true']:disabled {
   align-items: center;
   gap: 12px;
   padding: 4px 4px 4px 16px;
-  animation: toast-in 0.55s var(--spring);
+  animation: toast-in var(--dur-enter) var(--spring);
+}
+
+.toast.undo-toast > span,
+.toast.update-toast > span {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .toast.undo-toast > span,
@@ -2848,7 +2848,7 @@ button[aria-busy='true']:disabled {
   border-radius: 6px;
   color: var(--text);
   font-weight: 700;
-  transition: background-color 0.2s ease;
+  transition: background-color var(--dur-ui) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -2868,46 +2868,58 @@ button[aria-busy='true']:disabled {
 
 @keyframes toast-in {
   from {
-    transform: translateY(-140%);
+    opacity: 0;
+    transform: translateY(-140%) rotate(-0.6deg);
     clip-path: inset(100% 0 0 0 round 18px);
   }
+  60% {
+    clip-path: inset(0 0 0 0 round 18px);
+  }
   to {
+    opacity: 1;
+    transform: none;
     clip-path: inset(0 0 0 0 round 18px);
   }
 }
 
 @keyframes toast-out {
   to {
-    transform: translateY(-12px) scale(0.96);
+    transform: translateY(-14px) rotate(-0.6deg);
     opacity: 0;
-    filter: blur(4px);
+    filter: blur(3px);
   }
 }
 
 .row-fresh {
-  animation: row-in 0.6s var(--ease-out);
+  position: relative;
+  animation: row-in var(--dur-enter) var(--ease-paper);
+}
+
+.row-fresh::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 1.5px;
+  background: var(--sun);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: rule-draw var(--dur-move) var(--ease-paper) forwards;
 }
 
 @keyframes row-in {
   from {
-    clip-path: inset(0 100% 0 0);
-    background-color: rgb(200 180 138 / 0.16);
+    background-color: rgb(216 196 154 / 0.14);
   }
-  60% {
-    clip-path: inset(0 0 0 0);
-    background-color: rgb(200 180 138 / 0.12);
+  to {
+    background-color: transparent;
   }
 }
 
 .row-strike {
   position: relative;
   overflow: hidden;
-  min-height: 0;
-  animation: row-out 0.34s var(--ease-out) forwards;
-}
-
-.card-list li.row-strike {
-  min-height: 0;
 }
 
 .row-strike::after {
@@ -2921,7 +2933,7 @@ button[aria-busy='true']:disabled {
   background: var(--text);
   transform: scaleX(0) rotate(-0.6deg);
   transform-origin: left center;
-  animation: ink-strike 0.18s 0.04s var(--ease-out) forwards;
+  animation: ink-strike var(--dur-ui) 0.04s var(--ease-out) forwards;
 }
 
 .list-row.row-strike::after {
@@ -2934,29 +2946,9 @@ button[aria-busy='true']:disabled {
   }
 }
 
-@keyframes row-out {
-  0% {
-    height: var(--row-h);
-    opacity: 1;
-  }
-  50% {
-    height: var(--row-h);
-    opacity: 1;
-    filter: blur(0);
-  }
-  100% {
-    height: 0;
-    opacity: 0;
-    filter: blur(2px);
-    border-top-width: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-  }
-}
-
 @supports not (view-transition-name: none) {
   .view-pane {
-    animation: pane-in 0.45s var(--ease-out);
+    animation: pane-settle var(--dur-enter) var(--ease-paper) both;
   }
 }
 
@@ -2965,13 +2957,17 @@ button[aria-busy='true']:disabled {
   animation: none;
 }
 
+:root[data-vt='rows'] .view-pane,
+:root[data-vt='rows'] .cat-layout {
+  view-transition-name: none;
+}
+
 ::view-transition-old(pane) {
-  animation: pane-out 0.22s var(--ease-in) both;
+  animation: pane-out var(--dur-move) var(--ease-paper) both;
 }
 
 ::view-transition-new(pane) {
-  animation: pane-in 0.5s var(--ease-out) both;
-  animation: pane-in 0.5s var(--spring-soft) both;
+  animation: pane-settle var(--dur-enter) var(--ease-paper) both;
 }
 
 :root[data-nav-dir='back']::view-transition-old(pane) {
@@ -2979,11 +2975,11 @@ button[aria-busy='true']:disabled {
 }
 
 :root[data-nav-dir='back']::view-transition-new(pane) {
-  animation-name: pane-in-back;
+  animation-name: pane-settle-back;
 }
 
 ::view-transition-group(pane) {
-  animation-duration: 0.5s;
+  animation-duration: var(--dur-enter);
 }
 
 .fab {
@@ -2999,11 +2995,11 @@ button[aria-busy='true']:disabled {
 }
 
 ::view-transition-old(month-body) {
-  animation: pane-out 0.2s var(--ease-in) both;
+  animation: pane-out var(--dur-move) var(--ease-paper) both;
 }
 
 ::view-transition-new(month-body) {
-  animation: pane-in 0.5s var(--spring-soft) both;
+  animation: pane-settle var(--dur-enter) var(--ease-paper) both;
 }
 
 :root[data-nav-dir='back']::view-transition-old(month-body) {
@@ -3011,7 +3007,7 @@ button[aria-busy='true']:disabled {
 }
 
 :root[data-nav-dir='back']::view-transition-new(month-body) {
-  animation-name: pane-in-back;
+  animation-name: pane-settle-back;
 }
 
 ::view-transition-group(nav-ink) {
@@ -3022,36 +3018,28 @@ button[aria-busy='true']:disabled {
 @keyframes pane-out {
   to {
     opacity: 0;
-    transform: translateX(-16px);
+    transform: translateY(-6px) scale(0.994);
   }
 }
 
 @keyframes pane-out-back {
   to {
     opacity: 0;
-    transform: translateX(16px);
+    transform: translateY(6px) scale(0.994);
   }
 }
 
-@keyframes pane-in {
+@keyframes pane-settle {
   from {
     opacity: 0;
-    transform: translateX(16px);
-    clip-path: inset(0 0 0 18% round 6px);
-  }
-  to {
-    clip-path: inset(0 0 0 0 round 6px);
+    transform: translateY(14px) rotate(0.35deg);
   }
 }
 
-@keyframes pane-in-back {
+@keyframes pane-settle-back {
   from {
     opacity: 0;
-    transform: translateX(-16px);
-    clip-path: inset(0 18% 0 0 round 6px);
-  }
-  to {
-    clip-path: inset(0 0 0 0 round 6px);
+    transform: translateY(-14px) rotate(-0.35deg);
   }
 }
 
@@ -3106,7 +3094,7 @@ button[aria-busy='true']:disabled {
   background: var(--field-bg);
   color: var(--text);
   scroll-snap-align: start;
-  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.4s var(--spring);
+  transition: border-color var(--dur-ui) ease, background-color var(--dur-ui) ease, transform 0.4s var(--spring);
 }
 
 .recent-pick > span {
@@ -3198,7 +3186,7 @@ button[aria-busy='true']:disabled {
   background: var(--ground-deep);
   color: var(--text);
   font-size: 1rem;
-  transition: border-color 0.2s ease;
+  transition: border-color var(--dur-ui) ease;
 }
 
 .hfield input {
@@ -3321,7 +3309,7 @@ button[aria-busy='true']:disabled {
   height: 100%;
   border-radius: 3px;
   background: var(--text);
-  transition: width 0.9s var(--ease-out);
+  transition: width 0.75s var(--spring-soft);
 }
 
 .loan-row.is-paid .loan-bar i {
@@ -3491,7 +3479,7 @@ button[aria-busy='true']:disabled {
   height: 100%;
   border-radius: 4px;
   background: var(--sun);
-  transition: width 0.9s var(--ease-out);
+  transition: width 0.75s var(--spring-soft);
 }
 
 .goal-pct {
@@ -3542,8 +3530,7 @@ button[aria-busy='true']:disabled {
 }
 
 .confirm[open] {
-  animation: confirm-in 0.4s var(--ease-out);
-  animation: confirm-in 0.4s var(--spring);
+  animation: confirm-in var(--dur-enter) var(--spring);
 }
 
 @keyframes confirm-in {
@@ -3555,7 +3542,7 @@ button[aria-busy='true']:disabled {
 
 .confirm::backdrop {
   background: rgb(8 18 14 / 0.66);
-  animation: backdrop-in 0.32s ease both;
+  animation: backdrop-in var(--dur-move) ease both;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -3912,7 +3899,6 @@ button[aria-busy='true']:disabled {
   }
 }
 
-/* Today sits in the middle of the five-tab bar and reads a little larger. */
 @media (max-width: 999px) {
   .bottom-nav a[href='#/categories'] {
     order: 1;
@@ -3968,7 +3954,7 @@ button[aria-busy='true']:disabled {
     font: 600 0.75rem/1 var(--font-ui);
     color: var(--text-2);
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--dur-ui) ease;
   }
 
   .rail:hover .nav-kbd,
@@ -3978,9 +3964,13 @@ button[aria-busy='true']:disabled {
 
   .fab .nav-kbd {
     position: absolute;
-    right: 14px;
-    border-color: rgb(16 36 28 / 0.4);
-    color: var(--ground);
+    top: 50%;
+    left: calc(100% + 10px);
+    right: auto;
+    margin-left: 0;
+    translate: 0 -50%;
+    border-color: var(--line);
+    color: var(--text-2);
   }
 }
 
@@ -4211,7 +4201,7 @@ button[aria-busy='true']:disabled {
   text-align: left;
   cursor: pointer;
   touch-action: manipulation;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--dur-ui) ease;
 }
 
 .fold:active {
@@ -4249,7 +4239,7 @@ button[aria-busy='true']:disabled {
 
 .fold .fold-chev svg {
   transform: rotate(-90deg);
-  transition: transform 0.25s var(--ease-out);
+  transition: transform var(--dur-ui) var(--ease-out);
 }
 
 .fold.is-open .fold-chev svg {
@@ -4296,7 +4286,7 @@ button[aria-busy='true']:disabled {
   color: var(--text);
   cursor: pointer;
   touch-action: manipulation;
-  transition: background-color 0.15s ease, border-color 0.2s ease;
+  transition: background-color var(--dur-ui) ease, border-color var(--dur-ui) ease;
 }
 
 .filters-btn.is-open {
@@ -4390,7 +4380,7 @@ button[aria-busy='true']:disabled {
   text-align: left;
   cursor: pointer;
   touch-action: manipulation;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--dur-ui) ease;
 }
 
 .when-sum:active {
@@ -4518,7 +4508,7 @@ button[aria-busy='true']:disabled {
   border-radius: 8px;
   color: var(--text-2);
   font-size: 0.8125rem;
-  transition: color 0.2s ease, transform 0.3s var(--spring);
+  transition: color var(--dur-ui) ease, transform 0.3s var(--spring);
 }
 
 .trend-bar:active {
@@ -4552,7 +4542,7 @@ button[aria-busy='true']:disabled {
   border-radius: 6px 6px 2px 2px;
   background: var(--text-2);
   opacity: 0.45;
-  transition: height 0.5s var(--ease-out), opacity 0.2s ease, background-color 0.2s ease;
+  transition: height 0.5s var(--ease-out), opacity 0.2s ease, background-color var(--dur-ui) ease;
 }
 
 .trend-bar.on .trend-fill {
@@ -4631,8 +4621,6 @@ button[aria-busy='true']:disabled {
   font-weight: 600;
 }
 
-/* iOS keeps the layout viewport at full height under the keyboard, so size and lift
-   the sheet with the visual viewport instead. --kb and --vvh come from App.jsx. */
 .sheet {
   max-height: min(92dvh, calc(var(--vvh, 100dvh) - 8px));
   scroll-padding-bottom: calc(88px + var(--safe-b));

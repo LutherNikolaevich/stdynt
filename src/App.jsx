@@ -441,6 +441,28 @@ const isPhoneLayout = () => typeof window !== 'undefined' && window.matchMedia?.
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
+const runViewTransition = (kind, commit) => {
+  if (typeof document === 'undefined' || !document.startViewTransition || prefersReducedMotion()) {
+    commit();
+    return Promise.resolve();
+  }
+  const root = document.documentElement;
+  const prev = root.dataset.vt;
+  root.dataset.vt = kind;
+  const restore = () => {
+    if (prev) root.dataset.vt = prev;
+    else delete root.dataset.vt;
+  };
+  try {
+    const transition = document.startViewTransition(() => flushSync(commit));
+    return transition.finished.catch(() => {}).then(restore);
+  } catch {
+    restore();
+    commit();
+    return Promise.resolve();
+  }
+};
+
 const TAP_STRENGTH = 0.9;
 const DRAG_STRENGTH = 6;
 
@@ -1126,11 +1148,7 @@ export default function App() {
         });
         window.scrollTo({ top: next === 'settings' ? 0 : scrollMemoRef.current[next] || 0 });
       };
-      if (document.startViewTransition && !prefersReducedMotion()) {
-        document.startViewTransition(commit);
-      } else {
-        commit();
-      }
+      runViewTransition('nav', commit);
     };
     const onPop = () => {
       if (!leavingRef.current) return;
@@ -1407,12 +1425,8 @@ export default function App() {
       setHoverCat(null);
     };
     if (target === periodOffset) return;
-    if (document.startViewTransition && !prefersReducedMotion()) {
-      document.documentElement.dataset.navDir = target >= periodOffset ? 'fwd' : 'back';
-      document.startViewTransition(() => flushSync(commit));
-    } else {
-      commit();
-    }
+    document.documentElement.dataset.navDir = target >= periodOffset ? 'fwd' : 'back';
+    runViewTransition('nav', commit);
   };
 
   const usageOf = (name) => data.expenses.filter((e) => e.category === name).length;
@@ -1696,17 +1710,27 @@ export default function App() {
   };
 
   const strikeOut = (id, commit) => {
-    const els = document.querySelectorAll(`[data-row="${id}"]`);
+    const els = [...document.querySelectorAll(`[data-row="${id}"]`)];
     if (els.length === 0 || prefersReducedMotion()) {
       commit();
       return;
     }
     if (els[0].classList.contains('row-strike')) return;
-    els.forEach((el) => {
-      el.style.setProperty('--row-h', `${el.offsetHeight}px`);
-      el.classList.add('row-strike');
-    });
-    setTimeout(commit, 360);
+    els.forEach((el) => el.classList.add('row-strike'));
+    setTimeout(() => {
+      const named = [];
+      document.querySelectorAll('[data-row]').forEach((el, i) => {
+        const box = el.getBoundingClientRect();
+        if (box.bottom < 0 || box.top > window.innerHeight) return;
+        el.style.viewTransitionName = `row-${el.dataset.row}-${i}`;
+        named.push(el);
+      });
+      runViewTransition('rows', commit).finally(() => {
+        named.forEach((el) => {
+          el.style.viewTransitionName = '';
+        });
+      });
+    }, 220);
   };
 
   const flashRow = (id) => {
@@ -3163,7 +3187,7 @@ export default function App() {
     const ringScale = ringR / radius;
     let ring = null;
     let offset = 0;
-    const slices = pieEntries.map(([cat, amt], i) => {
+    const slices = pieEntries.map(([cat, amt]) => {
       const len = (amt / pieTotal) * circum;
       const dash = Math.max(0.5, len - gap);
       const focused = pieFocus === cat;
@@ -3187,7 +3211,7 @@ export default function App() {
         <circle
           key={cat}
           className={`slice ${focused ? 'on' : ''} ${pieFocus && !focused ? 'off' : ''}`}
-          style={{ '--i': i, stroke: colorOf(cat) }}
+          style={{ stroke: colorOf(cat) }}
           cx="80"
           cy="80"
           r={radius}
