@@ -2119,8 +2119,43 @@ button[aria-busy='true']:disabled {
   transform: scale(0.9);
 }
 
+.math {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 20px;
+  border-top: 1.5px solid var(--panel-line);
+}
+
+.math > div {
+  padding: 10px 0 0;
+  min-width: 0;
+}
+
+.math > div + div {
+  padding-left: 12px;
+  border-left: 1.5px solid var(--panel-line);
+}
+
+.math dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.math dd {
+  font-family: var(--font-stamp);
+  font-stretch: var(--stamp-stretch);
+  font-weight: 700;
+  font-size: clamp(1.125rem, 6.2vw, 1.5rem);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
 .loans-math {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   margin-top: 12px;
 }
 
