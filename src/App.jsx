@@ -483,6 +483,7 @@ const LiquidWell = ({ level }) => {
     let dpr = 1;
     let dragX = null;
     let color = '';
+    let rgb = [216, 196, 154];
 
     const draw = () => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -501,14 +502,25 @@ const LiquidWell = ({ level }) => {
       body.lineTo(width, height);
       body.lineTo(0, height);
       body.closePath();
-      ctx.fillStyle = color;
+      const [r, g, b] = rgb;
+      const fill = ctx.createLinearGradient(0, base, 0, height);
+      fill.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.24)`);
+      fill.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.08)`);
+      ctx.fillStyle = fill;
+      ctx.fill(body);
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.lineJoin = 'round';
-      ctx.globalAlpha = 0.13;
-      ctx.fill(body);
-      ctx.globalAlpha = 1;
+      ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.35)`;
+      ctx.shadowBlur = 10;
       ctx.stroke(surface);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(246, 241, 228, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.save();
+      ctx.translate(0, 1);
+      ctx.stroke(surface);
+      ctx.restore();
     };
 
     const frame = (now) => {
@@ -536,6 +548,11 @@ const LiquidWell = ({ level }) => {
       head = parseFloat(getComputedStyle(well).getPropertyValue('--well-head')) || 56;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       color = getComputedStyle(canvas).color;
+      const parts = color.match(/\d+(\.\d+)?/g);
+      if (parts && parts.length >= 3) {
+        const vals = parts.slice(0, 3).map(Number);
+        rgb = vals.every((v) => v <= 1) ? vals.map((v) => Math.round(v * 255)) : vals;
+      }
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       draw();
@@ -3079,9 +3096,15 @@ export default function App() {
   const wellAvailable = hasDaily ? availableToday : fallbackIncome;
   const isNeg = wellAvailable < 0;
   const formattedTodayAbs = formatNumber(Math.abs(wellAvailable), sym);
-  const mathCellCount = 3 + (earnedToday > 0 ? 1 : 0);
-  const mathColumnsClass = ['', '', '', '', 'four', 'five'][mathCellCount];
   const wellPool = availableToday + spentToday;
+  const equationLabel = hasDaily
+    ? [
+        `${weekendOff ? 'Weekend' : 'Daily'} ${fmt(dailyToday)}`,
+        `${rolloverCarryover < 0 ? 'minus' : 'plus'} carried ${fmt(Math.abs(rolloverCarryover))}`,
+        ...(earnedToday > 0 ? [`plus income ${fmt(earnedToday)}`] : []),
+        `minus spent ${fmt(spentToday)}`
+      ].join(', ')
+    : `Income ${fmt(incomeMonthly)}`;
   const wellLevel = showWell
     ? hasDaily
       ? availableToday > 0 && wellPool > 0
@@ -3407,33 +3430,46 @@ export default function App() {
                     )}
                     </div>
                     {hasDaily ? (
-                        <dl className={`math ${mathColumnsClass}`}>
-                          <div>
-                            <dt>{weekendOff ? 'Weekend' : 'Daily'}</dt>
-                            <dd><Money value={dailyToday} sym={sym} /></dd>
-                          </div>
-                          <div>
-                            <dt>Carried</dt>
-                            <dd className={rolloverCarryover < 0 ? 'neg' : 'pos'}><Money value={rolloverCarryover} sym={sym} sign="both" /></dd>
-                          </div>
+                      <>
+                        <p className="sr-only">{equationLabel}.</p>
+                        <div className="equation" aria-hidden="true">
+                          <span className="eq-term">
+                            <span className="eq-value"><Money value={dailyToday} sym={sym} /></span>
+                            <span className="eq-label">{weekendOff ? 'Weekend' : 'Daily'}</span>
+                          </span>
+                          <span className="eq-op">{rolloverCarryover < 0 ? '−' : '+'}</span>
+                          <span className="eq-term">
+                            <span className={`eq-value ${rolloverCarryover < 0 ? 'neg' : 'pos'}`}>
+                              <Money value={Math.abs(rolloverCarryover)} sym={sym} />
+                            </span>
+                            <span className="eq-label">Carried</span>
+                          </span>
                           {earnedToday > 0 && (
-                            <div>
-                              <dt>Income</dt>
-                              <dd className="pos"><Money value={earnedToday} sym={sym} sign="+" /></dd>
-                            </div>
+                            <>
+                              <span className="eq-op">+</span>
+                              <span className="eq-term">
+                                <span className="eq-value pos"><Money value={earnedToday} sym={sym} /></span>
+                                <span className="eq-label">Income</span>
+                              </span>
+                            </>
                           )}
-                          <div>
-                            <dt>Spent</dt>
-                            <dd><Money value={spentToday} sym={sym} /></dd>
-                          </div>
-                        </dl>
+                          <span className="eq-op">−</span>
+                          <span className="eq-term">
+                            <span className="eq-value"><Money value={spentToday} sym={sym} /></span>
+                            <span className="eq-label">Spent</span>
+                          </span>
+                        </div>
+                      </>
                     ) : showWell && (
-                        <dl className="math">
-                          <div>
-                            <dt>Income</dt>
-                            <dd><Money value={incomeMonthly} sym={sym} /></dd>
-                          </div>
-                        </dl>
+                      <>
+                        <p className="sr-only">{equationLabel}.</p>
+                        <div className="equation single" aria-hidden="true">
+                          <span className="eq-term">
+                            <span className="eq-value"><Money value={incomeMonthly} sym={sym} /></span>
+                            <span className="eq-label">Income</span>
+                          </span>
+                        </div>
+                      </>
                     )}
                     </div>
 
@@ -3502,40 +3538,41 @@ export default function App() {
                       </p>
                     )}
                   </div>
+                  <div className={`month ${monthState}`}>
+                    <div className="month-line">
+                      <span className="month-name">
+                        {periodName}{monthlyBudget > 0 ? ' budget' : ' spending'}
+                      </span>
+                      <span className="month-pct">
+                        {monthlyBudget > 0 ? (
+                          <><b>{percentMonthlyUsed.toFixed(0)}%</b> used</>
+                        ) : (
+                          <><b>{fmt(totalMonthlyCommitted)}</b> spent</>
+                        )}
+                      </span>
+                    </div>
+                    {monthlyBudget > 0 && (
+                      <div className="month-bar" aria-hidden="true">
+                        <i style={{ width: `${Math.min(100, Math.max(0, percentMonthlyUsed))}%` }} />
+                        <b style={{ left: `${alertThresh}%` }} />
+                      </div>
+                    )}
+                    {monthlyBudget > 0 && (
+                      <p className="month-sub">
+                        <span className="month-figure">
+                          <span className="num">{fmt(totalMonthlyCommitted)}</span> of{' '}
+                          <span className="num">{fmt(monthAvailable)}</span>
+                        </span>
+                        <span className="month-figure">
+                          <span className="num">{fmt(Math.abs(remainingMonthly))}</span> {remainingMonthly < 0 ? 'over' : 'left'}
+                        </span>
+                        {remainingMonthly >= 0 && perDayLeft > 0 && daysLeftInPeriod > 1 && (
+                          <span className="month-figure"><span className="num">{fmt(perDayLeft)}</span> a day</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
                 </section>
-
-                <div className={`month ${monthState}`}>
-                  <div className="month-line">
-                    <span>
-                      {periodName} · <span className="num">{fmt(totalMonthlyCommitted)}</span>{' '}
-                      {monthlyBudget > 0 ? (
-                        <>
-                          of <span className="num">{fmt(monthAvailable)}</span>
-                        </>
-                      ) : (
-                        'spent'
-                      )}
-                    </span>
-                    </div>
-                  {monthlyBudget > 0 && (
-                    <div className="month-bar" aria-hidden="true">
-                      <i style={{ width: `${Math.min(100, Math.max(0, percentMonthlyUsed))}%` }} />
-                      <b style={{ left: `${alertThresh}%` }} />
-                    </div>
-                  )}
-                  {}
-                  {monthlyBudget > 0 && (
-                    <p className="month-sub">
-                      <span className="num">{fmt(Math.abs(remainingMonthly))}</span> {remainingMonthly < 0 ? 'over' : 'left'}
-                      {perDayLeft > 0 && daysLeftInPeriod > 1 && (
-                        <>
-                          {' · '}
-                          <span className="num">{fmt(perDayLeft)}</span> a day
-                        </>
-                      )}
-                    </p>
-                  )}
-                </div>
               </div>
 
               <section className="history">
