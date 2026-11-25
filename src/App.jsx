@@ -914,7 +914,6 @@ export default function App() {
   const [historyCat, setHistoryCat] = useState('');
   const [noticeKey, setNoticeKey] = useState(0);
   const [settingsFormKey, setSettingsFormKey] = useState(0);
-  const [settingsSavedAt, setSettingsSavedAt] = useState(0);
   const [catMove, setCatMove] = useState(null);
   const [rowEdit, setRowEdit] = useState(null);
   const [loanFilter, setLoanFilter] = useState('all');
@@ -989,8 +988,9 @@ export default function App() {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const focused = document.activeElement;
-        if (!focused?.matches?.('input, select, textarea') || !focused.closest('dialog[open]')) return;
-        focused.scrollIntoView({ block: 'nearest' });
+        if (!focused?.matches?.('input, select, textarea')) return;
+        const covered = focused.getBoundingClientRect().bottom > viewport.height - 12;
+        if (focused.closest('dialog[open]') || covered) focused.scrollIntoView({ block: 'nearest' });
       });
     };
     sync();
@@ -1022,12 +1022,6 @@ export default function App() {
     }, 4000);
     return () => clearTimeout(t);
   }, [notice, undo, noticeKey]);
-
-  useEffect(() => {
-    if (!settingsSavedAt) return;
-    const t = setTimeout(() => setSettingsSavedAt(0), 2000);
-    return () => clearTimeout(t);
-  }, [settingsSavedAt]);
 
   const [canInstall, setCanInstall] = useState(Boolean(installPrompt));
   useEffect(() => {
@@ -2886,7 +2880,7 @@ export default function App() {
     };
     if (Object.keys(patch).every((k) => patch[k] === saved[k])) return;
     commitSettings(patch);
-    setSettingsSavedAt(Date.now());
+    say('Saved.');
   };
 
   const onSettingsBlur = (e) => {
@@ -3128,7 +3122,7 @@ export default function App() {
   const isNeg = wellAvailable < 0;
   const formattedTodayAbs = formatNumber(Math.abs(wellAvailable), sym);
   const wellPool = availableToday + spentToday;
-  const equationLabel = hasDaily
+  const summaryLabel = hasDaily
     ? [
         `${weekendOff ? 'Weekend' : 'Daily'} ${fmt(dailyToday)}`,
         `${rolloverCarryover < 0 ? 'minus' : 'plus'} carried ${fmt(Math.abs(rolloverCarryover))}`,
@@ -3218,8 +3212,27 @@ export default function App() {
           }}
         />
       );
+      const hit = (
+        <circle
+          key={`${cat}-hit`}
+          className="slice-hit"
+          cx="80"
+          cy="80"
+          r={radius}
+          fill="none"
+          stroke="transparent"
+          strokeDasharray={`${dash} ${circum - dash}`}
+          strokeDashoffset={-offset}
+          transform="rotate(-90 80 80)"
+          aria-hidden="true"
+          focusable="false"
+          onPointerEnter={(e) => e.pointerType === 'mouse' && setHoverCat(cat)}
+          onPointerLeave={() => setHoverCat(null)}
+          onClick={() => togglePick(cat)}
+        />
+      );
       offset += len;
-      return el;
+      return [el, hit];
     });
     return ring ? [...slices, ring] : slices;
   };
@@ -3464,44 +3477,37 @@ export default function App() {
                     </div>
                     {hasDaily ? (
                       <>
-                        <p className="sr-only">{equationLabel}.</p>
-                        <div className="equation" aria-hidden="true">
-                          <span className="eq-term">
-                            <span className="eq-value"><Money value={dailyToday} sym={sym} /></span>
-                            <span className="eq-label">{weekendOff ? 'Weekend' : 'Daily'}</span>
-                          </span>
-                          <span className="eq-op">{rolloverCarryover < 0 ? '−' : '+'}</span>
-                          <span className="eq-term">
-                            <span className={`eq-value ${rolloverCarryover < 0 ? 'neg' : 'pos'}`}>
-                              <Money value={Math.abs(rolloverCarryover)} sym={sym} />
-                            </span>
-                            <span className="eq-label">Carried</span>
-                          </span>
-                          {earnedToday > 0 && (
-                            <>
-                              <span className="eq-op">+</span>
-                              <span className="eq-term">
-                                <span className="eq-value pos"><Money value={earnedToday} sym={sym} /></span>
-                                <span className="eq-label">Income</span>
-                              </span>
-                            </>
-                          )}
-                          <span className="eq-op">−</span>
-                          <span className="eq-term">
-                            <span className="eq-value"><Money value={spentToday} sym={sym} /></span>
-                            <span className="eq-label">Spent</span>
-                          </span>
-                        </div>
+                        <p className="sr-only">{summaryLabel}.</p>
+                        <dl className="math today-math" aria-hidden="true">
+                          <div>
+                            <dt>{weekendOff ? 'Weekend' : 'Daily'}</dt>
+                            <dd><Money value={dailyToday} sym={sym} /></dd>
+                          </div>
+                          <div>
+                            <dt>Carried</dt>
+                            <dd className={rolloverCarryover < 0 ? 'neg' : 'pos'}>
+                              <Money value={rolloverCarryover} sym={sym} />
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Income</dt>
+                            <dd className={earnedToday > 0 ? 'pos' : ''}><Money value={earnedToday} sym={sym} /></dd>
+                          </div>
+                          <div>
+                            <dt>Spent</dt>
+                            <dd><Money value={spentToday} sym={sym} /></dd>
+                          </div>
+                        </dl>
                       </>
                     ) : showWell && (
                       <>
-                        <p className="sr-only">{equationLabel}.</p>
-                        <div className="equation single" aria-hidden="true">
-                          <span className="eq-term">
-                            <span className="eq-value"><Money value={incomeMonthly} sym={sym} /></span>
-                            <span className="eq-label">Income</span>
-                          </span>
-                        </div>
+                        <p className="sr-only">{summaryLabel}.</p>
+                        <dl className="math today-math single" aria-hidden="true">
+                          <div>
+                            <dt>Income</dt>
+                            <dd><Money value={incomeMonthly} sym={sym} /></dd>
+                          </div>
+                        </dl>
                       </>
                     )}
                     </div>
@@ -4621,9 +4627,6 @@ export default function App() {
                 <h1 id="settings-heading">Settings</h1>
                 <div className="settings-sub">
                   <h2>Budget</h2>
-                  <p className="saved-note" role="status">
-                    {settingsSavedAt ? 'Saved' : ''}
-                  </p>
                 </div>
                 <form
                   key={settingsFormKey}
@@ -5441,6 +5444,15 @@ export default function App() {
                 >
                   Set my allowance
                 </button>
+                {canInstall && (
+                  <button type="button" className="btn outline full" onClick={install}>
+                    <Smartphone size={16} strokeWidth={2} aria-hidden="true" />
+                    Install as an app
+                  </button>
+                )}
+                {!canInstall && IOS_NOT_INSTALLED && (
+                  <p className="hint">Tap Share, then Add to Home Screen.</p>
+                )}
                 <button type="button" className="text-btn" onClick={skipIntro}>
                   Set up later
                 </button>
