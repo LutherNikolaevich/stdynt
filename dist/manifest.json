@@ -4,8 +4,8 @@
   "description": "Student budget tracker with daily rollover",
   "start_url": "./#/today",
   "display": "standalone",
-  "background_color": "#172d24",
-  "theme_color": "#172d24",
+  "background_color": "#10241c",
+  "theme_color": "#10241c",
   "icons": [
     {
       "src": "icon-192.png",

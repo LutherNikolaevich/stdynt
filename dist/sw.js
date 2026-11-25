@@ -1,10 +1,10 @@
-const VERSION = "149ff02f8dc3";
+const VERSION = "e3a24169589a";
 const PRECACHE = [
   "./assets/bricolage-grotesque-latin-ext-wdth-normal-DoS1gVTC.woff2",
   "./assets/bricolage-grotesque-latin-wdth-normal-Dtb2a5nO.woff2",
   "./assets/bricolage-grotesque-vietnamese-wdth-normal-BKE08zty.woff2",
-  "./assets/index-Brfzsv8q.js",
-  "./assets/index-D_kahlSf.css",
+  "./assets/index-BnQRNbI3.css",
+  "./assets/index-DcMR7sYN.js",
   "./icon-192-maskable.png",
   "./icon-192.png",
   "./icon-512-maskable.png",
