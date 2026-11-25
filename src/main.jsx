@@ -4,7 +4,6 @@ import App, { announceNewBuild } from './App.jsx';
 import '@fontsource-variable/bricolage-grotesque/wdth.css';
 import './index.css';
 
-// iOS ignores user-scalable=no, so its pinch gesture is cancelled here (Safari-only events).
 for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
   document.addEventListener(type, (event) => event.preventDefault());
 }
@@ -56,7 +55,6 @@ class ErrorBoundary extends React.Component {
             fontFamily: "'Bricolage Grotesque Variable', system-ui, sans-serif"
           }}
         >
-          {}
           <div
             className="card"
             style={{
@@ -75,7 +73,6 @@ class ErrorBoundary extends React.Component {
                 ? 'stdynt hit a problem it could not recover from. What you saved is still on this device. Save a copy of it before trying anything else.'
                 : 'stdynt hit a problem it could not recover from.'}
             </p>
-            {}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {saved && (
                 <button type="button" className="btn ink" onClick={() => saveCopy(saved)}>
