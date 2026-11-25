@@ -1,5 +1,5 @@
 const VERSION = '__VERSION__';
-const PRECACHE = [/*__PRECACHE__*/];
+const PRECACHE = __PRECACHE__;
 const CACHE_NAME = `stdynt-${VERSION}`;
 const SHELL_URL = './index.html';
 const MATCH = { ignoreVary: true };

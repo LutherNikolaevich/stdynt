@@ -346,9 +346,8 @@ const cleanMoneyInput = (v) => v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$
 const numericLock = (e) => {
   clearValidity(e);
   const el = e.currentTarget;
-  const v = el.value;
-  const cleaned = v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
-  if (cleaned !== v) el.value = cleaned;
+  const cleaned = cleanMoneyInput(el.value);
+  if (cleaned !== el.value) el.value = cleaned;
 };
 const textLock = (e) => {
   clearValidity(e);
@@ -3224,11 +3223,9 @@ export default function App() {
         ) : (
           <span className="brand">stdynt</span>
         )}
-        {}
         <span className={view === 'today' && hasDaily ? 'sr-only' : 'topbar-date'}>
           {parseDate(todayStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
         </span>
-        {}
         {!isSettings && (
           <a
             className="icon-btn settings-btn"
@@ -3242,7 +3239,6 @@ export default function App() {
         )}
       </header>
 
-      {}
       <div className="rail">
         {fabTarget && fabTarget[0] === 'add-accounts' && (
           <>
@@ -3368,7 +3364,6 @@ export default function App() {
           </div>
         )}
 
-        {}
         <div className="live-slot" role="status">
           {!isSettings && view !== 'today' && isOverAlert && (
             <div className={`slip ${monthState}`}>
@@ -3387,7 +3382,6 @@ export default function App() {
             <>
               <div className="today-col">
                 <section className="card day-card" aria-labelledby="today-label">
-                  {}
                   <div className="today">
                     <div className={`well ${showWell && isNeg ? 'debt' : ''}`} style={{ '--level': wellLevel }}>
                     {showWell && <LiquidWell level={Number(wellLevel)} />}
@@ -3404,7 +3398,6 @@ export default function App() {
                               ? `${fmt(perDayLeft)} a day lasts until ${periodLastDay}.`
                               : 'Choose how much of your monthly budget to spend each day.'}
                         </p>
-                        {}
                         <div className="setup-actions">
                           {hasBudgetSet && perDayLeft > 0 && (
                             <button type="button" className="btn ink" onClick={() => applySuggestedDaily(null)}>
@@ -3475,7 +3468,6 @@ export default function App() {
                     </div>
 
                   <div className="ledger">
-                    {}
                     {todaysEntries.map((exp) => (
                       <div key={exp.id} className="ledger-row today-row" data-row={exp.id}>
                         <button
@@ -3497,7 +3489,6 @@ export default function App() {
                         </button>
                       </div>
                     ))}
-                    {}
                     {dayRows.length > 0 && (
                       <button
                         type="button"
@@ -3519,7 +3510,6 @@ export default function App() {
                         )}
                       </button>
                     )}
-                    {}
                     <div id="earlier-days" hidden={!earlierOpen}>
                     {earlierOpen && [...dayRows.filter((r) => !r.base).slice(0, 7), ...dayRows.filter((r) => r.base)].map((row) => (
                       <div key={row.date} className={`ledger-row past ${row.base ? 'base-row' : ''}`}>
@@ -4596,7 +4586,6 @@ export default function App() {
                     {settingsSavedAt ? 'Saved' : ''}
                   </p>
                 </div>
-                {}
                 <form
                   key={settingsFormKey}
                   onSubmit={(e) => {
@@ -4632,7 +4621,6 @@ export default function App() {
                       onInput={numericLock}
                     />
                   </label>
-                  {}
                   <div className="field">
                     <label htmlFor="set-daily">Daily budget</label>
                     <input
@@ -4722,7 +4710,6 @@ export default function App() {
 
               <section className="card pad" id="categories-settings" aria-labelledby="cats-heading">
                 <h2 id="cats-heading">Expense categories</h2>
-                {}
                 <div className="cat-head" aria-hidden="true">
                   <span>Ink</span>
                   <span>Name</span>
@@ -4937,7 +4924,6 @@ export default function App() {
         )}
       </main>
 
-      {}
       <div className="live-slot" role="status">
         {undo ? (
           <div
@@ -4966,7 +4952,6 @@ export default function App() {
         )}
       </div>
 
-      {}
       <dialog
         ref={sheetRef}
         className={`sheet ${sheetClosing ? 'closing' : ''}`}
@@ -4998,8 +4983,6 @@ export default function App() {
               <X size={22} strokeWidth={2} />
             </button>
           </div>
-          {}
-          {}
           {!editing && (
             <div className="radio-seg kind-seg" role="group" aria-label="Entry type">
               {[
@@ -5020,7 +5003,6 @@ export default function App() {
               ))}
             </div>
           )}
-          {}
           {!editing && sheetMemory.recent.length > 0 && (
             <div className="recent" role="group" aria-labelledby="recent-name">
               <span id="recent-name" className="recent-name">
@@ -5040,7 +5022,6 @@ export default function App() {
             <span>Amount</span>
             <div className="amount-wrap">
               <span className="amount-sym">{sym}</span>
-              {}
               <input
                 ref={amountInputRef}
                 name="amount"
@@ -5054,7 +5035,6 @@ export default function App() {
               />
             </div>
           </label>
-          {}
           <fieldset className="chips" hidden={sheetKind === 'income'} aria-labelledby="chips-name">
             <legend>
               <span id="chips-name">Category</span>
@@ -5180,7 +5160,6 @@ export default function App() {
         </form>
       </dialog>
 
-      {}
       <dialog
         ref={addSheetRef}
         className={`sheet ${addSheetClosing ? 'closing' : ''}`}
@@ -5412,7 +5391,6 @@ export default function App() {
         </div>
       </dialog>
 
-      {}
       <dialog
         ref={introRef}
         className="sheet intro"
@@ -5543,7 +5521,6 @@ export default function App() {
         </form>
       </dialog>
 
-      {}
       <dialog
         ref={askRef}
         className="confirm"
