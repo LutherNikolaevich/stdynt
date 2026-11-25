@@ -1,6 +1,6 @@
 
 :root {
-  /* Surface ladder: ground, well, then three raised surfaces. */
+
   --ground: #10241c;
   --ground-deep: #0b1a14;
   --surface-1: #173026;
@@ -9,13 +9,11 @@
   --line: #2a4d3c;
   --line-strong: #3a6450;
 
-  /* Text */
   --text-1: #f6f1e4;
   --text: var(--text-1);
   --text-2: #b9c2ab;
   --text-3: #94a288;
 
-  /* Money, debt and warning. Tan is money you have, never an action. */
   --accent-money: #d8c49a;
   --sun: var(--accent-money);
   --accent-debt: #f0806f;
@@ -26,7 +24,6 @@
   --warn-bar: var(--accent-warn);
   --over-bar: var(--accent-debt);
 
-  /* Aliases kept so existing rules keep working while the ladder migrates. */
   --panel: var(--surface-1);
   --panel-2: var(--surface-2);
   --panel-line: #2f5443;
@@ -37,14 +34,12 @@
   --placeholder: #98a584;
   --btn-ghost-hover: var(--surface-3);
 
-  /* Cream washes and rims, so one-off rgba values can retire. */
   --wash-1: rgb(246 241 228 / 0.06);
   --wash-2: rgb(246 241 228 / 0.1);
   --wash-3: rgb(246 241 228 / 0.16);
   --rim-1: rgb(246 241 228 / 0.14);
   --rim-2: rgb(246 241 228 / 0.05);
 
-  /* Type scale. Labels never go below 13px, except the five-tab nav. */
   --text-h1: 1.75rem;
   --text-h2: 1.375rem;
   --text-h3: 1.125rem;
@@ -53,7 +48,6 @@
   --text-label: 0.8125rem;
   --text-caption: 0.78125rem;
 
-  /* Space scale. */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -66,7 +60,6 @@
   --space-10: 72px;
 
   --stamp-stretch: 88%;
-
 
   --glass-tint: color-mix(in srgb, var(--ground-deep) 84%, transparent);
   --glass-filter: blur(28px) saturate(1.12) brightness(1.04);
@@ -110,10 +103,9 @@
 html {
   background: var(--ground);
   -webkit-text-size-adjust: 100%;
-  /* Installed app: no pinch or double-tap zoom, but panning still scrolls. Safari ignores user-scalable=no, so main.jsx blocks its gesture events too. */
+
   touch-action: pan-x pan-y;
-  /* Installed app, local data: a pull-down at the top should not reload the page (Android).
-     contain rather than none so the native edge bounce/glow stays. */
+
   overscroll-behavior-y: contain;
   scrollbar-color: var(--control-border) var(--ground-deep);
   scroll-padding-top: calc(72px + env(safe-area-inset-top, 0px));
@@ -241,7 +233,6 @@ button[aria-busy='true']:disabled {
   font-variant-numeric: tabular-nums;
 }
 
-
 .no-js {
   display: block;
   max-width: 34ch;
@@ -250,7 +241,6 @@ button[aria-busy='true']:disabled {
   font-weight: 600;
   text-wrap: balance;
 }
-
 
 .app {
   min-height: 100dvh;
@@ -398,7 +388,6 @@ button[aria-busy='true']:disabled {
   min-width: 0;
 }
 
-
 .card {
   background:
     linear-gradient(180deg, rgb(246 241 228 / 0.035), rgb(246 241 228 / 0) 120px),
@@ -465,7 +454,6 @@ button[aria-busy='true']:disabled {
 .card-title-row:has(> .card-empty) > h2 {
   font-size: 1.25rem;
 }
-
 
 .today {
   position: relative;
@@ -535,12 +523,10 @@ button[aria-busy='true']:disabled {
   display: block;
 }
 
-/* Sideways drags stir the liquid; vertical ones still scroll the page. */
 .well.live {
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
 }
-
 
 .well.live.stirring {
   -webkit-user-select: none;
@@ -719,7 +705,6 @@ button[aria-busy='true']:disabled {
 .neg {
   color: var(--red);
 }
-
 
 .ledger {
   background: var(--panel);
@@ -953,7 +938,6 @@ button[aria-busy='true']:disabled {
   color: var(--text-2);
 }
 
-
 .month {
   padding: var(--space-3) var(--space-5) var(--space-4);
   border-top: 1.5px solid var(--panel-line);
@@ -1050,7 +1034,6 @@ button[aria-busy='true']:disabled {
   color: var(--red);
 }
 
-
 .slip {
   display: flex;
   align-items: flex-start;
@@ -1120,7 +1103,6 @@ button[aria-busy='true']:disabled {
   white-space: nowrap;
 }
 
-
 .history {
   margin-top: 8px;
   min-width: 0;
@@ -1158,7 +1140,6 @@ button[aria-busy='true']:disabled {
   text-underline-offset: 3px;
   transition: color 0.2s ease, text-underline-offset 0.35s var(--spring);
 }
-
 
 .text-btn:active {
   color: var(--text);
@@ -1231,7 +1212,6 @@ button[aria-busy='true']:disabled {
   }
 }
 
-
 .history-day {
   border-top: 1px solid var(--line);
 }
@@ -1274,7 +1254,6 @@ button[aria-busy='true']:disabled {
   white-space: nowrap;
   color: var(--text);
 }
-
 
 .day-total {
   display: flex;
@@ -1416,7 +1395,6 @@ button[aria-busy='true']:disabled {
   }
 }
 }
-
 
 .cat-layout {
   display: flex;
@@ -1633,7 +1611,6 @@ button[aria-busy='true']:disabled {
   font-weight: 500;
 }
 
-
 .today {
   container-type: inline-size;
 }
@@ -1691,7 +1668,6 @@ button[aria-busy='true']:disabled {
   display: none;
 }
 
-
 .sort-seg {
   display: flex;
   gap: 4px;
@@ -1742,7 +1718,6 @@ button[aria-busy='true']:disabled {
   outline-offset: 2px;
 }
 
-
 .backup-slip {
   box-shadow: inset 0 0 0 2px var(--panel-line);
 }
@@ -1755,7 +1730,6 @@ button[aria-busy='true']:disabled {
   font-weight: 500;
   color: var(--text-2);
 }
-
 
 .cat-list li {
   gap: 10px;
@@ -1854,7 +1828,6 @@ button[aria-busy='true']:disabled {
   text-align: right;
   white-space: nowrap;
 }
-
 
 .field {
   display: flex;
@@ -2019,7 +1992,6 @@ button[aria-busy='true']:disabled {
   outline-offset: 2px;
 }
 
-
 .btn {
   display: inline-flex;
   align-items: center;
@@ -2095,7 +2067,6 @@ button[aria-busy='true']:disabled {
   gap: 8px;
   margin-top: 16px;
 }
-
 
 .btn-row .btn:only-child {
   grid-column: 1 / -1;
@@ -2278,7 +2249,6 @@ button[aria-busy='true']:disabled {
 .account-chips legend {
   margin-bottom: 8px;
 }
-
 
 .fab {
   position: fixed;
@@ -2501,7 +2471,6 @@ button[aria-busy='true']:disabled {
   view-transition-name: nav-ink;
 }
 
-
 .sheet {
   margin: auto auto 0;
   width: 100%;
@@ -2592,7 +2561,6 @@ button[aria-busy='true']:disabled {
   padding: 16px 16px calc(20px + var(--safe-b));
   min-width: 0;
 }
-
 
 .sheet .add-form {
   margin-top: 0;
@@ -2809,7 +2777,6 @@ button[aria-busy='true']:disabled {
   outline-offset: -2px;
 }
 
-
 .toast {
   position: fixed;
   left: 50%;
@@ -2885,7 +2852,6 @@ button[aria-busy='true']:disabled {
   }
 }
 
-
 .row-fresh {
   animation: row-in 0.6s var(--ease-out);
 }
@@ -2955,7 +2921,6 @@ button[aria-busy='true']:disabled {
     padding-bottom: 0;
   }
 }
-
 
 @supports not (view-transition-name: none) {
   .view-pane {
@@ -3058,7 +3023,6 @@ button[aria-busy='true']:disabled {
   }
 }
 
-
 .setup-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3068,7 +3032,6 @@ button[aria-busy='true']:disabled {
 .setup-actions .btn {
   flex: 1 1 auto;
 }
-
 
 .recent {
   display: flex;
@@ -3155,7 +3118,6 @@ button[aria-busy='true']:disabled {
   grid-column: 1 / -1;
 }
 
-
 .history-tools {
   display: grid;
   align-items: center;
@@ -3240,7 +3202,6 @@ button[aria-busy='true']:disabled {
   font-size: 0.875rem;
   color: var(--text-2);
 }
-
 
 .card-list .row-open {
   gap: 12px;
@@ -3614,7 +3575,6 @@ button[aria-busy='true']:disabled {
   margin-top: 0;
 }
 
-
 .settings-sub {
   display: flex;
   justify-content: space-between;
@@ -3662,7 +3622,6 @@ button[aria-busy='true']:disabled {
   color: var(--text-2);
 }
 
-
 @media (max-width: 360px) {
   .ledger-head,
   .ledger-row {
@@ -3700,7 +3659,6 @@ button[aria-busy='true']:disabled {
     margin-left: -26px;
   }
 }
-
 
 @media (min-width: 640px) {
   .app {
@@ -3758,7 +3716,6 @@ button[aria-busy='true']:disabled {
     }
   }
 }
-
 
 @media (min-width: 1000px) {
   .app,
@@ -3968,8 +3925,6 @@ button[aria-busy='true']:disabled {
   }
 }
 
-
-
 @media (max-width: 999px) {
   .app,
   .app.view-settings {
@@ -3995,17 +3950,14 @@ button[aria-busy='true']:disabled {
   }
 }
 
-
 @media (max-width: 999px) and (max-height: 520px) and (orientation: landscape) {
   :root {
     --nav-h: 48px;
   }
 
-
   .well {
     min-height: 176px;
   }
-
 
   .app:not(.view-settings) .topbar {
     position: static;
@@ -4014,7 +3966,6 @@ button[aria-busy='true']:disabled {
   .app {
     padding-bottom: calc(var(--nav-h) + 88px + var(--safe-b));
   }
-
 
   .fab {
     left: calc(100% - max(16px, env(safe-area-inset-right, 0px)));
@@ -4027,7 +3978,6 @@ button[aria-busy='true']:disabled {
   .bottom-nav::before {
     height: 32px;
   }
-
 
   .bottom-nav a {
     flex-direction: row;
@@ -4051,7 +4001,6 @@ button[aria-busy='true']:disabled {
     border-radius: 10px;
   }
 }
-
 
 .fold-body[hidden],
 .sheet-row[hidden],
@@ -4236,7 +4185,6 @@ button[aria-busy='true']:disabled {
   padding: 4px 0 8px;
 }
 
-
 .filters-btn {
   position: relative;
   display: grid;
@@ -4309,7 +4257,6 @@ button[aria-busy='true']:disabled {
   }
 }
 
-
 .sheet-foot {
   position: sticky;
   bottom: 0;
@@ -4318,7 +4265,6 @@ button[aria-busy='true']:disabled {
   padding: 12px 16px calc(20px + var(--safe-b));
   background: var(--grain), var(--panel);
 }
-
 
 .add-form > .sheet-foot {
   flex: 1 1 100%;
@@ -4369,7 +4315,6 @@ button[aria-busy='true']:disabled {
   text-underline-offset: 3px;
 }
 
-
 .account-chips {
   position: relative;
   flex-wrap: nowrap;
@@ -4390,8 +4335,6 @@ button[aria-busy='true']:disabled {
   scroll-snap-align: start;
 }
 
-
-
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
 
   @media (max-width: 999px) {
@@ -4402,7 +4345,6 @@ button[aria-busy='true']:disabled {
       border-top-color: transparent;
       box-shadow: inset 0 1px 0 var(--rim);
     }
-
 
     .bottom-nav::before {
       height: 24px;
@@ -4554,7 +4496,6 @@ button[aria-busy='true']:disabled {
   margin-top: 8px;
 }
 
-/* First run: welcome, allowance, then today's number. */
 .intro-lead {
   font-size: 1.0625rem;
   line-height: 1.5;

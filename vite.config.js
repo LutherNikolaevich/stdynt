@@ -28,6 +28,7 @@ const contentSecurityPolicy = () => ({
 
 const precacheManifest = () => {
   let outDir = 'dist';
+  let swTemplate = 'public/sw.js';
   const walk = (dir) =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
       entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)]
@@ -37,8 +38,9 @@ const precacheManifest = () => {
     apply: 'build',
     configResolved(config) {
       outDir = resolve(config.root, config.build.outDir);
+      if (config.publicDir) swTemplate = join(config.publicDir, 'sw.js');
     },
-    closeBundle() {
+    writeBundle() {
       const swPath = join(outDir, 'sw.js');
       const hash = createHash('sha256');
       const urls = walk(outDir)
@@ -49,11 +51,13 @@ const precacheManifest = () => {
           hash.update(url).update(readFileSync(file));
           return url;
         });
-      const source = readFileSync(swPath, 'utf8');
+      const source = readFileSync(swTemplate, 'utf8');
+      if (!source.includes("'__VERSION__'") || !source.includes('__PRECACHE__')) {
+        throw new Error(`sw.js template is missing its placeholders: ${swTemplate}`);
+      }
       const filled = source
         .replace("'__VERSION__'", JSON.stringify(hash.digest('hex').slice(0, 12)))
-        .replace('[/*__PRECACHE__*/]', JSON.stringify(urls, null, 2));
-      if (filled === source) throw new Error('sw.js placeholders not found; the app would not work offline');
+        .replace('__PRECACHE__', JSON.stringify(urls, null, 2));
       writeFileSync(swPath, filled);
     }
   };
