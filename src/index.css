@@ -4598,3 +4598,18 @@ button[aria-busy='true']:disabled {
 .intro-label {
   font-weight: 600;
 }
+
+/* iOS keeps the layout viewport at full height under the keyboard, so size and lift
+   the sheet with the visual viewport instead. --kb and --vvh come from App.jsx. */
+.sheet {
+  max-height: min(92dvh, calc(var(--vvh, 100dvh) - 8px));
+  margin-bottom: var(--kb, 0px);
+  scroll-padding-bottom: calc(88px + var(--safe-b));
+}
+
+@media (max-width: 639px) {
+  .sheet {
+    border-bottom-left-radius: max(0px, 20px - var(--kb, 0px));
+    border-bottom-right-radius: max(0px, 20px - var(--kb, 0px));
+  }
+}
