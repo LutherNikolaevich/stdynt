@@ -978,6 +978,34 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const root = document.documentElement;
+    let frame = 0;
+    const sync = () => {
+      const inset = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
+      root.style.setProperty('--kb', `${inset}px`);
+      root.style.setProperty('--vvh', `${Math.round(viewport.height)}px`);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const focused = document.activeElement;
+        if (!focused?.matches?.('input, select, textarea') || !focused.closest('dialog[open]')) return;
+        focused.scrollIntoView({ block: 'nearest' });
+      });
+    };
+    sync();
+    viewport.addEventListener('resize', sync, { passive: true });
+    viewport.addEventListener('scroll', sync, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport.removeEventListener('resize', sync);
+      viewport.removeEventListener('scroll', sync);
+      root.style.removeProperty('--kb');
+      root.style.removeProperty('--vvh');
+    };
+  }, []);
+
+  useEffect(() => {
     if (storageCorrupted) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
