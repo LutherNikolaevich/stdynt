@@ -55,7 +55,6 @@ class ErrorBoundary extends React.Component {
             fontFamily: "'Bricolage Grotesque Variable', system-ui, sans-serif"
           }}
         >
-          {}
           <div
             className="card"
             style={{
@@ -74,7 +73,6 @@ class ErrorBoundary extends React.Component {
                 ? 'stdynt hit a problem it could not recover from. What you saved is still on this device. Save a copy of it before trying anything else.'
                 : 'stdynt hit a problem it could not recover from.'}
             </p>
-            {}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {saved && (
                 <button type="button" className="btn ink" onClick={() => saveCopy(saved)}>
