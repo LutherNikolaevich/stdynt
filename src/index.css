@@ -3875,6 +3875,45 @@ button[aria-busy='true']:disabled {
   }
 }
 
+/* Today sits in the middle of the five-tab bar and reads a little larger. */
+@media (max-width: 999px) {
+  .bottom-nav a[href='#/categories'] {
+    order: 1;
+  }
+
+  .bottom-nav a[href='#/subs'] {
+    order: 2;
+  }
+
+  .bottom-nav a[href='#/today'] {
+    order: 3;
+  }
+
+  .bottom-nav a[href='#/loans'] {
+    order: 4;
+  }
+
+  .bottom-nav a[href='#/accounts'] {
+    order: 5;
+  }
+
+  .bottom-nav a[href='#/today'] {
+    gap: 5px;
+    font-size: 0.875rem;
+  }
+
+  .bottom-nav a[href='#/today'] svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .bottom-nav a[href='#/today'] .nav-ink {
+    width: 62px;
+    height: 34px;
+    margin: -17px 0 0 -31px;
+  }
+}
+
 .nav-kbd {
   display: none;
 }
@@ -3993,7 +4032,18 @@ button[aria-busy='true']:disabled {
     transform: none;
   }
 
-  .nav-ink {
+  .bottom-nav a[href='#/today'] {
+    gap: 8px;
+    font-size: 0.8125rem;
+  }
+
+  .bottom-nav a[href='#/today'] svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .nav-ink,
+  .bottom-nav a[href='#/today'] .nav-ink {
     inset: 6px 4px;
     width: auto;
     height: auto;
