@@ -88,7 +88,7 @@
   --rise: 8px;
 
   --nav-h: 72px;
-  --rail-w: 232px;
+  --rail-w: clamp(184px, 18vw, 216px); /* grows with the window; never squeezes the card */
   --safe-b: env(safe-area-inset-bottom, 0px);
 
   color-scheme: dark;
@@ -1398,6 +1398,12 @@ button[aria-busy='true']:disabled {
 
 .donut .slice.on {
   stroke-width: 28px;
+}
+
+.donut .slice-hit {
+  stroke-width: 38px;
+  pointer-events: stroke;
+  cursor: pointer;
 }
 
 .donut .slice.off {
@@ -2795,7 +2801,7 @@ button[aria-busy='true']:disabled {
 .toast {
   position: fixed;
   left: 50%;
-  top: calc(16px + env(safe-area-inset-top, 0px));
+  top: calc(72px + env(safe-area-inset-top, 0px));
   translate: -50% 0;
   z-index: 50;
   width: max-content;
@@ -2822,6 +2828,17 @@ button[aria-busy='true']:disabled {
   gap: 12px;
   padding: 4px 4px 4px 16px;
   animation: toast-in 0.55s var(--spring);
+}
+
+.toast.undo-toast > span,
+.toast.update-toast > span {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .toast-undo {
@@ -3598,12 +3615,6 @@ button[aria-busy='true']:disabled {
   margin-top: 16px;
 }
 
-.saved-note {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-2);
-}
-
 .field > label {
   font-size: 0.8125rem;
   font-weight: 600;
@@ -3679,10 +3690,6 @@ button[aria-busy='true']:disabled {
     padding-right: 24px;
   }
 
-  .fab {
-    width: min(712px, calc(100% - 48px));
-  }
-
   .card.pad {
     padding: 24px;
   }
@@ -3756,7 +3763,7 @@ button[aria-busy='true']:disabled {
     grid-template-areas:
       'top top'
       'rail main';
-    column-gap: 40px;
+    column-gap: clamp(24px, 2.5vw, 32px);
     max-width: 1200px;
     padding: 8px 40px 56px;
   }
@@ -3792,7 +3799,7 @@ button[aria-busy='true']:disabled {
     left: auto;
     bottom: auto;
     translate: none;
-    width: 100%;
+    width: 56px;
   }
 
   .bottom-nav {
@@ -4044,6 +4051,19 @@ button[aria-busy='true']:disabled {
     bottom: calc(var(--nav-h) + 12px + var(--safe-b));
   }
 
+  .fab-actions {
+    left: calc(100% - max(16px, env(safe-area-inset-right, 0px)));
+    bottom: calc(var(--nav-h) + 12px + var(--safe-b) + 64px);
+    gap: 8px;
+    max-height: calc(100dvh - var(--nav-h) - var(--safe-b) - 84px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .fab-action {
+    height: 48px;
+  }
+
   .bottom-nav::before {
     height: 32px;
   }
@@ -4092,7 +4112,6 @@ button[aria-busy='true']:disabled {
   .add-form,
   .loan-panel,
   .goal-panel,
-  .saved-note,
   .day-rows,
   #earlier-days:not([hidden]),
   .settings-form .fold-body:not([hidden]),
@@ -4616,12 +4635,12 @@ button[aria-busy='true']:disabled {
    the sheet with the visual viewport instead. --kb and --vvh come from App.jsx. */
 .sheet {
   max-height: min(92dvh, calc(var(--vvh, 100dvh) - 8px));
-  margin-bottom: var(--kb, 0px);
   scroll-padding-bottom: calc(88px + var(--safe-b));
 }
 
 @media (max-width: 639px) {
   .sheet {
+    margin-bottom: var(--kb, 0px);
     border-bottom-left-radius: max(0px, 20px - var(--kb, 0px));
     border-bottom-right-radius: max(0px, 20px - var(--kb, 0px));
   }
