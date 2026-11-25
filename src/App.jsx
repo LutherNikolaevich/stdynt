@@ -419,8 +419,6 @@ const buzz = (ms = 8) => {
   }
 };
 
-// Chromium fires this once the app can be installed. Kept at module level because it can
-// arrive before React mounts. The browser's own install offer is left alone.
 let installPrompt = null;
 const installWatchers = new Set();
 const setInstallPrompt = (e) => {
@@ -435,10 +433,7 @@ export const announceNewBuild = () => {
 };
 window.addEventListener('beforeinstallprompt', setInstallPrompt);
 window.addEventListener('appinstalled', () => setInstallPrompt(null));
-// iOS has no install prompt. navigator.standalone only exists there: false means
-// "in Safari, not on the home screen", which is when the manual steps are worth showing.
 const IOS_NOT_INSTALLED = navigator.standalone === false;
-// Its own key, not part of the saved data: it is about this browser, and must not travel in a backup.
 const INSTALL_HINT_KEY = 'stdynt_install_hint_off';
 const readInstallHintOff = () => {
   try {
@@ -453,14 +448,9 @@ const isPhoneLayout = () => typeof window !== 'undefined' && window.matchMedia?.
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-// The well's level as a liquid you can touch. A tap dents the surface where the finger
-// lands; dragging sideways stirs it along the path. Under reduced motion the canvas
-// never takes over, and the flat CSS level (.well::before and ::after) stays.
 const TAP_STRENGTH = 0.9;
 const DRAG_STRENGTH = 6;
 
-// The surface never rises past this many pixels above the resting line at full level,
-// so a hard stir stays inside the gap under the label and date.
 const MAX_RISE = 12;
 
 const LiquidWell = ({ level }) => {
@@ -474,7 +464,6 @@ const LiquidWell = ({ level }) => {
     wakeRef.current?.();
   }, [level]);
 
-  // The setting can change while the app is open: follow it, both ways.
   useEffect(() => {
     const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     if (!query) return;
@@ -500,6 +489,7 @@ const LiquidWell = ({ level }) => {
     let dpr = 1;
     let dragX = null;
     let color = '';
+    let rgb = [216, 196, 154];
 
     const draw = () => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -518,14 +508,25 @@ const LiquidWell = ({ level }) => {
       body.lineTo(width, height);
       body.lineTo(0, height);
       body.closePath();
-      ctx.fillStyle = color;
+      const [r, g, b] = rgb;
+      const fill = ctx.createLinearGradient(0, base, 0, height);
+      fill.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.24)`);
+      fill.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.08)`);
+      ctx.fillStyle = fill;
+      ctx.fill(body);
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.lineJoin = 'round';
-      ctx.globalAlpha = 0.13;
-      ctx.fill(body);
-      ctx.globalAlpha = 1;
+      ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.35)`;
+      ctx.shadowBlur = 10;
       ctx.stroke(surface);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(246, 241, 228, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.save();
+      ctx.translate(0, 1);
+      ctx.stroke(surface);
+      ctx.restore();
     };
 
     const frame = (now) => {
@@ -553,6 +554,11 @@ const LiquidWell = ({ level }) => {
       head = parseFloat(getComputedStyle(well).getPropertyValue('--well-head')) || 56;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       color = getComputedStyle(canvas).color;
+      const parts = color.match(/\d+(\.\d+)?/g);
+      if (parts && parts.length >= 3) {
+        const vals = parts.slice(0, 3).map(Number);
+        rgb = vals.every((v) => v <= 1) ? vals.map((v) => Math.round(v * 255)) : vals;
+      }
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       draw();
@@ -563,14 +569,12 @@ const LiquidWell = ({ level }) => {
     const onDown = (e) => {
       if (e.button > 0) return;
       dragX = across(e);
-      // Text stays selectable until a stir starts, so the figure can still be copied.
       well.classList.add('stirring');
       pokeLiquid(liquid, dragX, TAP_STRENGTH);
       wake();
     };
 
     const onMove = (e) => {
-      // A mouse stirs while it is held; a finger is always held while it moves.
       if (dragX === null) return;
       const x = across(e);
       pokeLiquid(liquid, x, Math.min(0.5, Math.abs(x - dragX) * DRAG_STRENGTH));
@@ -713,8 +717,6 @@ const MONEY_TIERS = 3;
 const shortNumber = (num, currencySymbol, tier) => {
   const n = Math.abs(Number(num || 0));
   if (tier <= 0) return formatNumber(n, currencySymbol);
-  // Under a thousand there is no short form, so the cents go. From there up the
-  // figure turns into 11.38M, which nobody can mistake for the exact amount.
   if (n < 1000) return Math.round(n).toLocaleString('en-US');
   return new Intl.NumberFormat('en-US', {
     notation: 'compact',
@@ -722,9 +724,6 @@ const shortNumber = (num, currencySymbol, tier) => {
   }).format(n);
 };
 
-// Shows exact amounts when they fit the box, and rounds them off when they would be cut.
-// Each part is { value, sign, className }. sign: 'neg' marks only negatives, 'both' always
-// shows + or −, '+' forces a plus. All parts shorten together.
 function MoneyFit({ parts, sym, className = '' }) {
   const ref = useRef(null);
   const [width, setWidth] = useState(0);
@@ -1241,10 +1240,7 @@ export default function App() {
   const accounts = data.accounts;
   const hasAccounts = accounts.length > 0;
   const accountOf = (id) => (has(id) ? accounts.find((a) => a.id === id) : undefined);
-  // What a row says it was paid from. "Cash" is what the pickers call no account, so a row
-  // saved that way says so too. With no accounts set up there is nothing to tell apart.
   const accountLabel = (id) => accountOf(id)?.name || (hasAccounts ? 'Cash' : undefined);
-  // A transfer side of null is cash.
   const transferSide = (id) => (id === null ? 'Cash' : accountOf(id)?.name || 'Removed account');
   const balances = useMemo(
     () =>
@@ -1567,7 +1563,6 @@ export default function App() {
       if (accountRow) {
         accountRow.scrollLeft = Math.max(0, pickedAccount.offsetLeft - (accountRow.clientWidth - pickedAccount.offsetWidth) / 2);
       }
-      // A previous session can leave the recents row half-scrolled.
       const recentRow = sheetRef.current?.querySelector('.recent-row');
       if (recentRow) recentRow.scrollLeft = 0;
       amountInputRef.current?.focus();
@@ -2234,7 +2229,6 @@ export default function App() {
     commitLoan({
       before: null,
       after: debt,
-      // An item bought on installment brings in no cash, so nothing is logged until a payment is.
       steps: isItem || existing ? [] : [loanStep(debt, null, id + 1)],
       message: existing
         ? `Added ${person}${alreadyPaid}, nothing logged.${planned}`
@@ -2251,7 +2245,6 @@ export default function App() {
     closeAddSheet();
   };
 
-  // Reads the plan inputs. null means the loan has no plan; undefined means a field was rejected.
   const readPlan = (form, amount, prev = null) => {
     const input = form.elements.count;
     if (!input) return null;
@@ -2278,7 +2271,6 @@ export default function App() {
         rejectField(eachInput, 'One payment cannot be more than the total.');
         return undefined;
       }
-      // An untouched even split follows the total and the number of payments when those change.
       const old = prev?.installment;
       if (old && each === old.amount && old.amount === planEach(prev.amount, old.count, zeroDecimal)) each = even;
     }
@@ -2379,7 +2371,6 @@ export default function App() {
     const steps = [];
     if (found) {
       const [kind, entry] = found;
-      // The log entry keeps a note the user rewrote there; one we wrote follows the payment.
       const ours = entry.note === loanEntry(debt, payment).note;
       steps.push([kind, entry, { ...entry, amount: next.amount, date: next.date, ...(ours ? { note: loanEntry(after, next).note } : {}) }]);
     }
@@ -3112,9 +3103,15 @@ export default function App() {
   const wellAvailable = hasDaily ? availableToday : fallbackIncome;
   const isNeg = wellAvailable < 0;
   const formattedTodayAbs = formatNumber(Math.abs(wellAvailable), sym);
-  const mathCellCount = 3 + (earnedToday > 0 ? 1 : 0);
-  const mathColumnsClass = ['', '', '', '', 'four', 'five'][mathCellCount];
   const wellPool = availableToday + spentToday;
+  const equationLabel = hasDaily
+    ? [
+        `${weekendOff ? 'Weekend' : 'Daily'} ${fmt(dailyToday)}`,
+        `${rolloverCarryover < 0 ? 'minus' : 'plus'} carried ${fmt(Math.abs(rolloverCarryover))}`,
+        ...(earnedToday > 0 ? [`plus income ${fmt(earnedToday)}`] : []),
+        `minus spent ${fmt(spentToday)}`
+      ].join(', ')
+    : `Income ${fmt(incomeMonthly)}`;
   const wellLevel = showWell
     ? hasDaily
       ? availableToday > 0 && wellPool > 0
@@ -3440,33 +3437,46 @@ export default function App() {
                     )}
                     </div>
                     {hasDaily ? (
-                        <dl className={`math ${mathColumnsClass}`}>
-                          <div>
-                            <dt>{weekendOff ? 'Weekend' : 'Daily'}</dt>
-                            <dd><Money value={dailyToday} sym={sym} /></dd>
-                          </div>
-                          <div>
-                            <dt>Carried</dt>
-                            <dd className={rolloverCarryover < 0 ? 'neg' : 'pos'}><Money value={rolloverCarryover} sym={sym} sign="both" /></dd>
-                          </div>
+                      <>
+                        <p className="sr-only">{equationLabel}.</p>
+                        <div className="equation" aria-hidden="true">
+                          <span className="eq-term">
+                            <span className="eq-value"><Money value={dailyToday} sym={sym} /></span>
+                            <span className="eq-label">{weekendOff ? 'Weekend' : 'Daily'}</span>
+                          </span>
+                          <span className="eq-op">{rolloverCarryover < 0 ? '−' : '+'}</span>
+                          <span className="eq-term">
+                            <span className={`eq-value ${rolloverCarryover < 0 ? 'neg' : 'pos'}`}>
+                              <Money value={Math.abs(rolloverCarryover)} sym={sym} />
+                            </span>
+                            <span className="eq-label">Carried</span>
+                          </span>
                           {earnedToday > 0 && (
-                            <div>
-                              <dt>Income</dt>
-                              <dd className="pos"><Money value={earnedToday} sym={sym} sign="+" /></dd>
-                            </div>
+                            <>
+                              <span className="eq-op">+</span>
+                              <span className="eq-term">
+                                <span className="eq-value pos"><Money value={earnedToday} sym={sym} /></span>
+                                <span className="eq-label">Income</span>
+                              </span>
+                            </>
                           )}
-                          <div>
-                            <dt>Spent</dt>
-                            <dd><Money value={spentToday} sym={sym} /></dd>
-                          </div>
-                        </dl>
+                          <span className="eq-op">−</span>
+                          <span className="eq-term">
+                            <span className="eq-value"><Money value={spentToday} sym={sym} /></span>
+                            <span className="eq-label">Spent</span>
+                          </span>
+                        </div>
+                      </>
                     ) : showWell && (
-                        <dl className="math">
-                          <div>
-                            <dt>Income</dt>
-                            <dd><Money value={incomeMonthly} sym={sym} /></dd>
-                          </div>
-                        </dl>
+                      <>
+                        <p className="sr-only">{equationLabel}.</p>
+                        <div className="equation single" aria-hidden="true">
+                          <span className="eq-term">
+                            <span className="eq-value"><Money value={incomeMonthly} sym={sym} /></span>
+                            <span className="eq-label">Income</span>
+                          </span>
+                        </div>
+                      </>
                     )}
                     </div>
 
@@ -3535,40 +3545,41 @@ export default function App() {
                       </p>
                     )}
                   </div>
+                  <div className={`month ${monthState}`}>
+                    <div className="month-line">
+                      <span className="month-name">
+                        {periodName}{monthlyBudget > 0 ? ' budget' : ' spending'}
+                      </span>
+                      <span className="month-pct">
+                        {monthlyBudget > 0 ? (
+                          <><b>{percentMonthlyUsed.toFixed(0)}%</b> used</>
+                        ) : (
+                          <><b>{fmt(totalMonthlyCommitted)}</b> spent</>
+                        )}
+                      </span>
+                    </div>
+                    {monthlyBudget > 0 && (
+                      <div className="month-bar" aria-hidden="true">
+                        <i style={{ width: `${Math.min(100, Math.max(0, percentMonthlyUsed))}%` }} />
+                        <b style={{ left: `${alertThresh}%` }} />
+                      </div>
+                    )}
+                    {monthlyBudget > 0 && (
+                      <p className="month-sub">
+                        <span className="month-figure">
+                          <span className="num">{fmt(totalMonthlyCommitted)}</span> of{' '}
+                          <span className="num">{fmt(monthAvailable)}</span>
+                        </span>
+                        <span className="month-figure">
+                          <span className="num">{fmt(Math.abs(remainingMonthly))}</span> {remainingMonthly < 0 ? 'over' : 'left'}
+                        </span>
+                        {remainingMonthly >= 0 && perDayLeft > 0 && daysLeftInPeriod > 1 && (
+                          <span className="month-figure"><span className="num">{fmt(perDayLeft)}</span> a day</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
                 </section>
-
-                <div className={`month ${monthState}`}>
-                  <div className="month-line">
-                    <span>
-                      {periodName} · <span className="num">{fmt(totalMonthlyCommitted)}</span>{' '}
-                      {monthlyBudget > 0 ? (
-                        <>
-                          of <span className="num">{fmt(monthAvailable)}</span>
-                        </>
-                      ) : (
-                        'spent'
-                      )}
-                    </span>
-                    </div>
-                  {monthlyBudget > 0 && (
-                    <div className="month-bar" aria-hidden="true">
-                      <i style={{ width: `${Math.min(100, Math.max(0, percentMonthlyUsed))}%` }} />
-                      <b style={{ left: `${alertThresh}%` }} />
-                    </div>
-                  )}
-                  {}
-                  {monthlyBudget > 0 && (
-                    <p className="month-sub">
-                      <span className="num">{fmt(Math.abs(remainingMonthly))}</span> {remainingMonthly < 0 ? 'over' : 'left'}
-                      {perDayLeft > 0 && daysLeftInPeriod > 1 && (
-                        <>
-                          {' · '}
-                          <span className="num">{fmt(perDayLeft)}</span> a day
-                        </>
-                      )}
-                    </p>
-                  )}
-                </div>
               </div>
 
               <section className="history">

@@ -278,13 +278,10 @@ export const loanEntry = (debt, payment = null) => {
   };
 };
 
-// Loan maths runs in whole cents so sums never pick up floating-point dust.
 const cents = (n) => Math.round((Number(n) || 0) * 100);
 
 export const PLAN_FREQUENCIES = ['weekly', 'biweekly', 'monthly', 'custom'];
 
-// A loan can carry an installment plan: { count, amount, frequency, everyDays, firstDue }.
-// `amount` is what each installment should be; `firstDue` may be null (no due dates, never overdue).
 export const planEach = (total, count, zeroDecimal = false) => {
   const n = Math.max(1, Math.round(Number(count)) || 1);
   const per = (Number(total) || 0) / n;
@@ -305,9 +302,6 @@ export const planDueDate = (plan, i) => {
 export const loanPaid = (debt) =>
   (Array.isArray(debt.payments) ? debt.payments.reduce((s, p) => s + cents(p.amount), 0) : 0) / 100;
 
-// The plan laid out as rows: { n, due, amount, paid, status }. Payments fill the
-// oldest installment first, so paying extra spills into the next one. The rows
-// always add up to the loan total: the last one takes whatever the others leave.
 export const loanSchedule = (debt) => {
   const plan = debt.installment;
   if (!plan) return [];

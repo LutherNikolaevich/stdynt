@@ -161,8 +161,6 @@ export function sanitizeData(raw, { todayStr, currencies, defaultCategory, defau
   }));
 
   const debtMap = new Map();
-  // Plans saved before schedules existed look like { months, dueDay, lastLogged }: a monthly
-  // plan whose first payment fell on the first due day after the loan started.
   const firstDueDay = (since, dueDay) => {
     const from = parseDate(since);
     for (let i = 0; i < 2; i++) {
@@ -270,7 +268,6 @@ export function sanitizeData(raw, { todayStr, currencies, defaultCategory, defau
     ...goals.flatMap((g) => g.contributions)
   ].forEach(relink);
 
-  // A side of null is cash. A side that is missing or unknown is not.
   const side = (v) => (v === null ? null : accountMap.get(v));
   const knownSide = (v) => v === null || accountMap.has(v);
   const transfers = keep(
