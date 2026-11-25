@@ -914,7 +914,6 @@ export default function App() {
   const [historyCat, setHistoryCat] = useState('');
   const [noticeKey, setNoticeKey] = useState(0);
   const [settingsFormKey, setSettingsFormKey] = useState(0);
-  const [settingsSavedAt, setSettingsSavedAt] = useState(0);
   const [catMove, setCatMove] = useState(null);
   const [rowEdit, setRowEdit] = useState(null);
   const [loanFilter, setLoanFilter] = useState('all');
@@ -989,8 +988,9 @@ export default function App() {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const focused = document.activeElement;
-        if (!focused?.matches?.('input, select, textarea') || !focused.closest('dialog[open]')) return;
-        focused.scrollIntoView({ block: 'nearest' });
+        if (!focused?.matches?.('input, select, textarea')) return;
+        const covered = focused.getBoundingClientRect().bottom > viewport.height - 12;
+        if (focused.closest('dialog[open]') || covered) focused.scrollIntoView({ block: 'nearest' });
       });
     };
     sync();
@@ -1022,12 +1022,6 @@ export default function App() {
     }, 4000);
     return () => clearTimeout(t);
   }, [notice, undo, noticeKey]);
-
-  useEffect(() => {
-    if (!settingsSavedAt) return;
-    const t = setTimeout(() => setSettingsSavedAt(0), 2000);
-    return () => clearTimeout(t);
-  }, [settingsSavedAt]);
 
   const [canInstall, setCanInstall] = useState(Boolean(installPrompt));
   useEffect(() => {
@@ -2886,7 +2880,7 @@ export default function App() {
     };
     if (Object.keys(patch).every((k) => patch[k] === saved[k])) return;
     commitSettings(patch);
-    setSettingsSavedAt(Date.now());
+    say('Saved.');
   };
 
   const onSettingsBlur = (e) => {
@@ -3218,8 +3212,27 @@ export default function App() {
           }}
         />
       );
+      const hit = (
+        <circle
+          key={`${cat}-hit`}
+          className="slice-hit"
+          cx="80"
+          cy="80"
+          r={radius}
+          fill="none"
+          stroke="transparent"
+          strokeDasharray={`${dash} ${circum - dash}`}
+          strokeDashoffset={-offset}
+          transform="rotate(-90 80 80)"
+          aria-hidden="true"
+          focusable="false"
+          onPointerEnter={(e) => e.pointerType === 'mouse' && setHoverCat(cat)}
+          onPointerLeave={() => setHoverCat(null)}
+          onClick={() => togglePick(cat)}
+        />
+      );
       offset += len;
-      return el;
+      return [el, hit];
     });
     return ring ? [...slices, ring] : slices;
   };
@@ -4614,9 +4627,6 @@ export default function App() {
                 <h1 id="settings-heading">Settings</h1>
                 <div className="settings-sub">
                   <h2>Budget</h2>
-                  <p className="saved-note" role="status">
-                    {settingsSavedAt ? 'Saved' : ''}
-                  </p>
                 </div>
                 <form
                   key={settingsFormKey}
