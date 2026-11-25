@@ -92,7 +92,7 @@
   --rise: 8px;
 
   --nav-h: 72px;
-  --rail-w: clamp(184px, 18vw, 216px);
+  --rail-w: clamp(184px, 18vw, 216px); /* grows with the window; never squeezes the card */
   --safe-b: env(safe-area-inset-bottom, 0px);
 
   color-scheme: dark;
@@ -2817,6 +2817,17 @@ button[aria-busy='true']:disabled {
   gap: 12px;
   padding: 4px 4px 4px 16px;
   animation: toast-in var(--dur-enter) var(--spring);
+}
+
+.toast.undo-toast > span,
+.toast.update-toast > span {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .toast.undo-toast > span,
