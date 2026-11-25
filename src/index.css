@@ -4592,6 +4592,10 @@ button[aria-busy='true']:disabled {
   justify-content: center;
 }
 
+.intro .sheet-foot .hint {
+  text-align: center;
+}
+
 .intro-error {
   color: var(--red);
 }
