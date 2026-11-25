@@ -5434,6 +5434,15 @@ export default function App() {
                 >
                   Set my allowance
                 </button>
+                {canInstall && (
+                  <button type="button" className="btn outline full" onClick={install}>
+                    <Smartphone size={16} strokeWidth={2} aria-hidden="true" />
+                    Install as an app
+                  </button>
+                )}
+                {!canInstall && IOS_NOT_INSTALLED && (
+                  <p className="hint">Tap Share, then Add to Home Screen.</p>
+                )}
                 <button type="button" className="text-btn" onClick={skipIntro}>
                   Set up later
                 </button>
