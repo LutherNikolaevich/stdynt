@@ -110,22 +110,17 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   let lastCheck = Date.now();
   let newBuildReady = false;
 
-  // A new build took over while this page was open. The page still runs the old code.
   sw.addEventListener('controllerchange', () => {
     if (!hadWorker) return;
     newBuildReady = true;
     announceNewBuild();
   });
 
-  // Anything a reload would throw away: an open sheet, a pending Undo, a field being typed in,
-  // or a text field whose value differs from what it was drawn with (an inline edit left half
-  // done). Choices (selects, radios, switches) save as they are picked, so they are not checked.
   const TEXT_FIELDS = 'input:not([type=radio]):not([type=checkbox]):not([type=file]), textarea';
   const busy = () =>
     Boolean(document.querySelector('dialog[open], .undo-toast')) ||
     Boolean(document.activeElement?.matches?.('input, select, textarea')) ||
     Array.from(document.querySelectorAll(TEXT_FIELDS)).some(
-      // A closed sheet keeps the last entry's values; only fields on screen count.
       (el) => el.value !== el.defaultValue && !el.closest('dialog:not([open])')
     );
 
@@ -135,9 +130,6 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     registration.update().catch(() => {});
   };
 
-  // An installed app is resumed far more often than it is opened, so it would otherwise
-  // never look for a new build or switch to one. Look when it comes back to the front;
-  // switch when it goes to the back, where a reload is invisible and nothing is mid-entry.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       if (newBuildReady && !busy()) window.location.reload();
