@@ -471,13 +471,12 @@ button[aria-busy='true']:disabled {
     radial-gradient(120% 80% at 20% 0%, rgb(246 241 228 / 0.055), rgb(246 241 228 / 0) 60%),
     var(--ground-deep);
   overflow: hidden;
-  --well-head: 56px;
 }
 
 .well::before {
   content: '';
   position: absolute;
-  inset: var(--well-head) 0 0;
+  inset: 0;
   z-index: -1;
   background: linear-gradient(to top, rgb(216 196 154 / 0.08), rgb(216 196 154 / 0.24));
   transform-origin: bottom;
@@ -491,7 +490,7 @@ button[aria-busy='true']:disabled {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(var(--level, 0) * (100% - var(--well-head)));
+  bottom: calc(var(--level, 0) * 100%);
   z-index: -1;
   height: 2px;
   margin-bottom: -2px;

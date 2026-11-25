@@ -445,8 +445,6 @@ const prefersReducedMotion = () =>
 const TAP_STRENGTH = 0.9;
 const DRAG_STRENGTH = 6;
 
-const MAX_RISE = 12;
-
 const LiquidWell = ({ level }) => {
   const canvasRef = useRef(null);
   const levelRef = useRef(level);
@@ -479,7 +477,6 @@ const LiquidWell = ({ level }) => {
     let shown = 0;
     let width = 0;
     let height = 0;
-    let head = 56;
     let dpr = 1;
     let dragX = null;
     let color = '';
@@ -489,12 +486,12 @@ const LiquidWell = ({ level }) => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
       if (shown < 0.001) return;
-      const base = height - shown * (height - head);
+      const base = height - shown * height;
       const { n, h } = liquid;
       const surface = new Path2D();
       for (let i = 0; i < n; i++) {
         const x = (i / (n - 1)) * width;
-        const y = Math.max(base - h[i] * width + 1, head - MAX_RISE);
+        const y = Math.max(base - h[i] * width + 1, 1);
         if (i === 0) surface.moveTo(x, y);
         else surface.lineTo(x, y);
       }
@@ -545,7 +542,6 @@ const LiquidWell = ({ level }) => {
     const resize = () => {
       width = well.clientWidth;
       height = well.clientHeight;
-      head = parseFloat(getComputedStyle(well).getPropertyValue('--well-head')) || 56;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       color = getComputedStyle(canvas).color;
       const parts = color.match(/\d+(\.\d+)?/g);
@@ -3105,14 +3101,22 @@ export default function App() {
         `minus spent ${fmt(spentToday)}`
       ].join(', ')
     : `Income ${fmt(incomeMonthly)}`;
+  const monthlyLevel =
+    monthlyBudget > 0
+      ? monthAvailable > 0
+        ? Math.min(1, Math.max(0, remainingMonthly / monthAvailable))
+        : 0
+      : null;
   const wellLevel = showWell
-    ? hasDaily
-      ? availableToday > 0 && wellPool > 0
-        ? Math.min(1, availableToday / wellPool).toFixed(4)
-        : 0
-      : fallbackIncome > 0
-        ? 1
-        : 0
+    ? monthlyLevel !== null
+      ? monthlyLevel.toFixed(4)
+      : hasDaily
+        ? availableToday > 0 && wellPool > 0
+          ? Math.min(1, availableToday / wellPool).toFixed(4)
+          : 0
+        : incomeMonthly > 0
+          ? Math.min(1, Math.max(0, fallbackIncome / incomeMonthly)).toFixed(4)
+          : 0
     : 0;
   const stampDigitsClass =
     formattedTodayAbs.length > 9 ? 'digits-xl' : formattedTodayAbs.length > 6 ? 'digits-lg' : '';
