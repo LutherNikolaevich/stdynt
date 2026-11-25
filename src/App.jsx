@@ -184,7 +184,6 @@ const makeDefaultState = () => ({
     onboarded: false,
     historySort: 'date',
     lastBackup: null,
-    backupSnoozed: null,
     lastCategory: null,
     lastAccount: null,
     earlierOpen: null
@@ -1456,10 +1455,18 @@ export default function App() {
   const hasAnyEntries =
     data.expenses.length + data.income.length + data.subscriptions.length + data.debts.length + accounts.length > 0;
   const lastFriday = lastFridayStr(todayStr);
-  const { lastBackup, backupSnoozed } = data.prefs;
-  const backupDue =
-    hasAnyEntries && !storageCorrupted && !(lastBackup >= lastFriday) && !(backupSnoozed >= lastFriday);
-  const snoozeBackup = () => setData((d) => ({ ...d, prefs: { ...d.prefs, backupSnoozed: todayStr } }));
+  const { lastBackup } = data.prefs;
+  const backupDue = hasAnyEntries && !storageCorrupted && !(lastBackup >= lastFriday);
+  const backupNotifiedRef = useRef(false);
+  useEffect(() => {
+    if (!backupDue || backupNotifiedRef.current || notice || undo) return;
+    backupNotifiedRef.current = true;
+    say(
+      lastBackup
+        ? `Time for your weekly backup. Last one was ${stampDate(lastBackup).toLowerCase().replace(/^0/, '')}.`
+        : 'No backup yet. Back one up from Settings.'
+    );
+  }, [backupDue, notice, undo, lastBackup]);
 
   const owed = data.debts.filter((d) => d.type === 'i_owe');
   const owedToMe = data.debts.filter((d) => d.type !== 'i_owe');
@@ -4899,33 +4906,6 @@ export default function App() {
           )}
         </div>
 
-        {view === 'today' && backupDue && (
-          <div className="slip backup-slip">
-            <Download size={18} strokeWidth={2.25} aria-hidden="true" />
-            <div className="slip-body">
-              <p>
-                Time for your weekly backup.{' '}
-                <span className="slip-meta">
-                  {lastBackup ? `Last backup ${stampDate(lastBackup).toLowerCase().replace(/^0/, '')}.` : 'No backup yet.'}
-                </span>
-              </p>
-              <div className="slip-actions">
-                <button
-                  type="button"
-                  className="btn ink"
-                  onClick={exportJSON}
-                  disabled={!!fileBusy}
-                  aria-busy={fileBusy === 'backup'}
-                >
-                  {fileBusy === 'backup' ? 'Saving…' : 'Back up'}
-                </button>
-                <button type="button" className="btn outline" onClick={snoozeBackup}>
-                  Not this week
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
       <div className="live-slot" role="status">

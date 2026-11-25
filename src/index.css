@@ -1717,19 +1717,6 @@ button[aria-busy='true']:disabled {
   outline-offset: 2px;
 }
 
-.backup-slip {
-  box-shadow: inset 0 0 0 2px var(--panel-line);
-}
-
-.backup-slip svg {
-  color: var(--text-2);
-}
-
-.slip-meta {
-  font-weight: 500;
-  color: var(--text-2);
-}
-
 .cat-list li {
   gap: 10px;
 }
