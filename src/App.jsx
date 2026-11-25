@@ -3394,8 +3394,8 @@ export default function App() {
               aria-current={view === id ? 'page' : undefined}
               aria-keyshortcuts={String(i + 1)}
             >
+              {view === id && <span className="nav-ink" aria-hidden="true" />}
               <span className="nav-icon">
-                {view === id && <span className="nav-ink" aria-hidden="true" />}
                 <Icon size={22} strokeWidth={2} aria-hidden="true" />
               </span>
               <span>{label}</span>
