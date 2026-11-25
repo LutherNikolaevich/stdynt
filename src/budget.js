@@ -191,6 +191,8 @@ export const parseAmount = (raw, zeroDecimal = false) => {
   return zeroDecimal ? Math.round(n) : Math.round(n * 100) / 100;
 };
 
+// A monthly allowance spread over the days left in the period, in whole cents
+// (or whole units where the currency has no cents).
 export const suggestDaily = (monthly, daysLeft, zeroDecimal = false) => {
   const n = Number(monthly) || 0;
   if (!(n > 0) || !(daysLeft > 0)) return 0;

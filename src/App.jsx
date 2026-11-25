@@ -348,6 +348,12 @@ const numericLock = (e) => {
   const el = e.currentTarget;
   const cleaned = cleanMoneyInput(el.value);
   if (cleaned !== el.value) el.value = cleaned;
+const numericLock = (e) => {
+  clearValidity(e);
+  const el = e.currentTarget;
+  const v = el.value;
+  const cleaned = v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  if (cleaned !== v) el.value = cleaned;
 };
 const textLock = (e) => {
   clearValidity(e);
@@ -862,6 +868,7 @@ const loadInitialData = () => {
       state: {
         ...lists,
         categories: normalizeCategories(parsed.categories, lists.expenses),
+        // A save from before this flag existed belongs to someone already using the app.
         prefs: { ...defaults.prefs, ...savedPrefs, onboarded: savedPrefs.onboarded !== false }
       },
       corrupted: false,

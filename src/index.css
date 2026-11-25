@@ -110,9 +110,10 @@
 html {
   background: var(--ground);
   -webkit-text-size-adjust: 100%;
-
+  /* Installed app: no pinch or double-tap zoom, but panning still scrolls. Safari ignores user-scalable=no, so main.jsx blocks its gesture events too. */
   touch-action: pan-x pan-y;
-
+  /* Installed app, local data: a pull-down at the top should not reload the page (Android).
+     contain rather than none so the native edge bounce/glow stays. */
   overscroll-behavior-y: contain;
   scrollbar-color: var(--control-border) var(--ground-deep);
   scroll-padding-top: calc(72px + env(safe-area-inset-top, 0px));
@@ -534,7 +535,7 @@ button[aria-busy='true']:disabled {
   display: block;
 }
 
-
+/* Sideways drags stir the liquid; vertical ones still scroll the page. */
 .well.live {
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
@@ -2355,7 +2356,7 @@ button[aria-busy='true']:disabled {
   white-space: nowrap;
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.5),
-    inset 0 -2px 3px rgb(16 36 28 / 0.1),
+    inset 0 -2px 3px rgb(23 45 36 / 0.1),
     var(--shadow-float);
   animation: dock-in 0.5s var(--spring) both;
 }
@@ -4553,7 +4554,7 @@ button[aria-busy='true']:disabled {
   margin-top: 8px;
 }
 
-
+/* First run: welcome, allowance, then today's number. */
 .intro-lead {
   font-size: 1.0625rem;
   line-height: 1.5;

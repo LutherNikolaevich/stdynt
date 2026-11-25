@@ -4,6 +4,7 @@ import App, { announceNewBuild } from './App.jsx';
 import '@fontsource-variable/bricolage-grotesque/wdth.css';
 import './index.css';
 
+// iOS ignores user-scalable=no, so its pinch gesture is cancelled here (Safari-only events).
 for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
   document.addEventListener(type, (event) => event.preventDefault());
 }
