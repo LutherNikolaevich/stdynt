@@ -3128,7 +3128,7 @@ export default function App() {
   const isNeg = wellAvailable < 0;
   const formattedTodayAbs = formatNumber(Math.abs(wellAvailable), sym);
   const wellPool = availableToday + spentToday;
-  const equationLabel = hasDaily
+  const summaryLabel = hasDaily
     ? [
         `${weekendOff ? 'Weekend' : 'Daily'} ${fmt(dailyToday)}`,
         `${rolloverCarryover < 0 ? 'minus' : 'plus'} carried ${fmt(Math.abs(rolloverCarryover))}`,
@@ -3464,44 +3464,37 @@ export default function App() {
                     </div>
                     {hasDaily ? (
                       <>
-                        <p className="sr-only">{equationLabel}.</p>
-                        <div className="equation" aria-hidden="true">
-                          <span className="eq-term">
-                            <span className="eq-value"><Money value={dailyToday} sym={sym} /></span>
-                            <span className="eq-label">{weekendOff ? 'Weekend' : 'Daily'}</span>
-                          </span>
-                          <span className="eq-op">{rolloverCarryover < 0 ? '−' : '+'}</span>
-                          <span className="eq-term">
-                            <span className={`eq-value ${rolloverCarryover < 0 ? 'neg' : 'pos'}`}>
-                              <Money value={Math.abs(rolloverCarryover)} sym={sym} />
-                            </span>
-                            <span className="eq-label">Carried</span>
-                          </span>
-                          {earnedToday > 0 && (
-                            <>
-                              <span className="eq-op">+</span>
-                              <span className="eq-term">
-                                <span className="eq-value pos"><Money value={earnedToday} sym={sym} /></span>
-                                <span className="eq-label">Income</span>
-                              </span>
-                            </>
-                          )}
-                          <span className="eq-op">−</span>
-                          <span className="eq-term">
-                            <span className="eq-value"><Money value={spentToday} sym={sym} /></span>
-                            <span className="eq-label">Spent</span>
-                          </span>
-                        </div>
+                        <p className="sr-only">{summaryLabel}.</p>
+                        <dl className="math today-math" aria-hidden="true">
+                          <div>
+                            <dt>{weekendOff ? 'Weekend' : 'Daily'}</dt>
+                            <dd><Money value={dailyToday} sym={sym} /></dd>
+                          </div>
+                          <div>
+                            <dt>Carried</dt>
+                            <dd className={rolloverCarryover < 0 ? 'neg' : 'pos'}>
+                              <Money value={rolloverCarryover} sym={sym} />
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Income</dt>
+                            <dd className={earnedToday > 0 ? 'pos' : ''}><Money value={earnedToday} sym={sym} /></dd>
+                          </div>
+                          <div>
+                            <dt>Spent</dt>
+                            <dd><Money value={spentToday} sym={sym} /></dd>
+                          </div>
+                        </dl>
                       </>
                     ) : showWell && (
                       <>
-                        <p className="sr-only">{equationLabel}.</p>
-                        <div className="equation single" aria-hidden="true">
-                          <span className="eq-term">
-                            <span className="eq-value"><Money value={incomeMonthly} sym={sym} /></span>
-                            <span className="eq-label">Income</span>
-                          </span>
-                        </div>
+                        <p className="sr-only">{summaryLabel}.</p>
+                        <dl className="math today-math single" aria-hidden="true">
+                          <div>
+                            <dt>Income</dt>
+                            <dd><Money value={incomeMonthly} sym={sym} /></dd>
+                          </div>
+                        </dl>
                       </>
                     )}
                     </div>
