@@ -93,34 +93,54 @@ const ZERO_DECIMAL_CURRENCIES = new Set(['¥', '₩', '₫', 'Rp']);
 
 const STORAGE_KEY = 'stdynt_data_v1';
 
-const INKS = ['#aaa2e6', '#e0a273', '#6fc3b0', '#e498ad', '#80b3e3', '#9dc97f', '#cc92ce', '#c3c577'];
-const UNKNOWN_INK = '#98a584';
+// Category inks: one shared lightness (78%) and chroma (0.1), hue only varies,
+// so no category reads heavier than another in the donut or legend.
+const INKS = [
+  'oklch(78% 0.1 289deg)',
+  'oklch(78% 0.1 58deg)',
+  'oklch(78% 0.1 177deg)',
+  'oklch(78% 0.1 2deg)',
+  'oklch(78% 0.1 248deg)',
+  'oklch(78% 0.1 133deg)',
+  'oklch(78% 0.1 325deg)',
+  'oklch(78% 0.1 110deg)'
+];
+const UNKNOWN_INK = 'oklch(70% 0.049 125deg)';
 
+// Old saves carry the previous hex palette; map each onto its new oklch ink.
 const LEGACY_INKS = {
-  '#a99bff': '#aaa2e6',
-  '#ff9f5a': '#e0a273',
-  '#3fd0b6': '#6fc3b0',
-  '#ff8fb0': '#e498ad',
-  '#5bb8ff': '#80b3e3',
-  '#8fd866': '#9dc97f',
-  '#e07be0': '#cc92ce',
-  '#c9cf5a': '#c3c577',
-  '#4b3a8c': '#aaa2e6',
-  '#57429c': '#aaa2e6',
-  '#a0681a': '#e0a273',
-  '#aa6a00': '#e0a273',
-  '#1f6f78': '#6fc3b0',
-  '#008674': '#6fc3b0',
-  '#8a4b2a': '#e498ad',
-  '#ad472e': '#e498ad',
-  '#24476b': '#80b3e3',
-  '#175d9b': '#80b3e3',
-  '#2f6b47': '#9dc97f',
-  '#316a23': '#9dc97f',
-  '#7d3c6b': '#cc92ce',
-  '#983c75': '#cc92ce',
-  '#5b6b1f': '#c3c577',
-  '#737c24': '#c3c577'
+  '#aaa2e6': INKS[0],
+  '#e0a273': INKS[1],
+  '#6fc3b0': INKS[2],
+  '#e498ad': INKS[3],
+  '#80b3e3': INKS[4],
+  '#9dc97f': INKS[5],
+  '#cc92ce': INKS[6],
+  '#c3c577': INKS[7],
+  '#a99bff': INKS[0],
+  '#ff9f5a': INKS[1],
+  '#3fd0b6': INKS[2],
+  '#ff8fb0': INKS[3],
+  '#5bb8ff': INKS[4],
+  '#8fd866': INKS[5],
+  '#e07be0': INKS[6],
+  '#c9cf5a': INKS[7],
+  '#4b3a8c': INKS[0],
+  '#57429c': INKS[0],
+  '#a0681a': INKS[1],
+  '#aa6a00': INKS[1],
+  '#1f6f78': INKS[2],
+  '#008674': INKS[2],
+  '#8a4b2a': INKS[3],
+  '#ad472e': INKS[3],
+  '#24476b': INKS[4],
+  '#175d9b': INKS[4],
+  '#2f6b47': INKS[5],
+  '#316a23': INKS[5],
+  '#7d3c6b': INKS[6],
+  '#983c75': INKS[6],
+  '#5b6b1f': INKS[7],
+  '#737c24': INKS[7]
 };
 
 const DEFAULT_CATEGORIES = [
@@ -143,7 +163,7 @@ const normalizeCategories = (raw, expenses = []) => {
     const n = String(name || '').trim().slice(0, CATEGORY_NAME_MAX);
     if (!n || seen.has(n.toLowerCase())) return;
     seen.add(n.toLowerCase());
-    const valid = typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color);
+    const valid = typeof color === 'string' && /^(#[0-9a-f]{6}|oklch\([^)]+\))$/i.test(color);
     out.push({
       id: id || `cat-${Date.now().toString(36)}-${out.length}`,
       name: n,
@@ -466,6 +486,22 @@ const runViewTransition = (kind, commit) => {
 const TAP_STRENGTH = 0.9;
 const DRAG_STRENGTH = 6;
 
+// Ask the canvas to resolve a token colour to sRGB. Tokens are authored in
+// oklch(), so measuring their digits would read L, C and H as if they were R,
+// G and B; painting one pixel gives back the real triplet.
+const resolveRgb = (() => {
+  const ctx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+  return (cssColor) => {
+    if (!ctx) return null;
+    ctx.fillStyle = '#ff00ff';
+    ctx.fillStyle = cssColor;
+    if (ctx.fillStyle === '#ff00ff') return null;
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillRect(0, 0, 1, 1);
+    return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+  };
+})();
+
 const LiquidWell = ({ level }) => {
   const canvasRef = useRef(null);
   const levelRef = useRef(level);
@@ -533,7 +569,7 @@ const LiquidWell = ({ level }) => {
       ctx.shadowBlur = 10;
       ctx.stroke(surface);
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(246, 241, 228, 0.3)';
+      ctx.strokeStyle = 'oklch(96% 0.017 92deg / 30%)';
       ctx.lineWidth = 1;
       ctx.save();
       ctx.translate(0, 1);
@@ -565,11 +601,7 @@ const LiquidWell = ({ level }) => {
       height = well.clientHeight;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       color = getComputedStyle(canvas).color;
-      const parts = color.match(/\d+(\.\d+)?/g);
-      if (parts && parts.length >= 3) {
-        const vals = parts.slice(0, 3).map(Number);
-        rgb = vals.every((v) => v <= 1) ? vals.map((v) => Math.round(v * 255)) : vals;
-      }
+      rgb = resolveRgb(color) || rgb;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       draw();
@@ -1896,7 +1928,7 @@ export default function App() {
       .filter(Boolean)
       .join(' · ');
     return (
-      <li key={exp.id} className={`list-row ${isIncome ? 'is-income' : ''}`} data-row={exp.id}>
+      <li key={exp.id} className="list-row" data-row={exp.id}>
         <button
           type="button"
           className="row-open"
@@ -3393,12 +3425,13 @@ export default function App() {
               onClick={(e) => onNavClick(e, id)}
               aria-current={view === id ? 'page' : undefined}
               aria-keyshortcuts={String(i + 1)}
+              aria-label={label}
             >
               {view === id && <span className="nav-ink" aria-hidden="true" />}
               <span className="nav-icon">
                 <Icon size={22} strokeWidth={2} aria-hidden="true" />
               </span>
-              <span>{label}</span>
+              <span className="nav-label">{label}</span>
               <kbd className="nav-kbd" aria-hidden="true">{i + 1}</kbd>
             </a>
           ))}
@@ -3613,7 +3646,7 @@ export default function App() {
                     </div>
                     {monthlyBudget > 0 && (
                       <div className="month-bar" aria-hidden="true">
-                        <i style={{ width: `${Math.min(100, Math.max(0, percentMonthlyUsed))}%` }} />
+                        <i style={{ '--pct': Math.min(100, Math.max(0, percentMonthlyUsed)) / 100 }} />
                         <b style={{ left: `${alertThresh}%` }} />
                       </div>
                     )}
@@ -3720,7 +3753,7 @@ export default function App() {
                           const n = day.entries.length;
                           const panelId = `history-day-${i}`;
                           return (
-                            <li key={`${day.date}:${i}`} className={`history-day ${open ? 'is-open' : ''}`}>
+                            <li key={`${day.date}:${i}`} className="history-day">
                               <button
                                 type="button"
                                 className="day-head"
@@ -3955,7 +3988,7 @@ export default function App() {
                       .filter(Boolean)
                       .join(' · ');
                     return (
-                      <li key={sub.id} data-row={sub.id} className={editingThis ? 'is-editing' : ''}>
+                      <li key={sub.id} data-row={sub.id}>
                         {editingThis ? (
                           <form className="row-edit" onSubmit={(e) => saveSub(e, sub)}>
                             <label className="field grow">
@@ -4080,7 +4113,7 @@ export default function App() {
                             .filter(Boolean)
                             .join(' · ');
                     return (
-                      <li key={debt.id} data-row={debt.id} className={`loan-row ${editingThis ? 'is-editing' : ''} ${paidUp ? 'is-paid' : ''}`}>
+                      <li key={debt.id} data-row={debt.id} className={`loan-row ${paidUp ? 'is-paid' : ''}`}>
                         <button
                           type="button"
                           className="row-open"
@@ -4134,7 +4167,7 @@ export default function App() {
                             aria-valuemax={100}
                             aria-valuenow={Math.round(sum.progress * 100)}
                           >
-                            <i style={{ width: `${sum.progress * 100}%` }} />
+                            <i style={{ '--pct': sum.progress }} />
                           </div>
                           <p className="loan-plan muted">
                             {sum.status === 'overdue' && <b className="loan-badge overdue">{sum.overdue} overdue</b>}
@@ -4202,7 +4235,7 @@ export default function App() {
                                 <ul className="pay-list" aria-label="Payments so far">
                                   {payRows.map((p) =>
                                     payEdit === p.id ? (
-                                      <li key={p.id} className="pay-editing">
+                                      <li key={p.id}>
                                         <form className="row-edit pay-form" onSubmit={(e) => savePayment(e, debt, p)}>
                                           <label className="field grow">
                                             <span>Paid</span>
@@ -4328,7 +4361,7 @@ export default function App() {
                     const live = balanceOf(acc);
                     const editPresets = ACCOUNT_PRESETS[editAccountType] || ACCOUNT_PRESETS.bank;
                     return (
-                      <li key={acc.id} data-row={acc.id} className={editingThis ? 'is-editing' : ''}>
+                      <li key={acc.id} data-row={acc.id}>
                         {editingThis ? (
                           <form className="row-edit" onSubmit={(e) => saveAccount(e, acc)}>
                             <fieldset className="radio-seg grow-full">
@@ -4444,7 +4477,7 @@ export default function App() {
                           const to = transferSide(t.toId);
                           const editingThis = rowEdit?.list === 'transfers' && rowEdit.id === t.id;
                           return (
-                            <li key={t.id} data-row={t.id} className={editingThis ? 'is-editing' : ''}>
+                            <li key={t.id} data-row={t.id}>
                               {editingThis ? (
                                 <form className="row-edit transfer-form" onSubmit={(e) => saveTransfer(e, t)} onChange={clearTransferValidity}>
                                   {transferFields(t)}
@@ -4557,7 +4590,7 @@ export default function App() {
                               aria-valuemax={100}
                               aria-valuenow={Math.round(progress.pct)}
                             >
-                              <i style={{ width: `${progress.pct}%` }} />
+                              <i style={{ '--pct': progress.pct / 100 }} />
                             </div>
                             <span className="goal-pct">{Math.round(progress.pct)}%</span>
                           </div>
@@ -4600,7 +4633,7 @@ export default function App() {
                                   <ul className="pay-list" aria-label={`Money set aside for ${goal.name}`}>
                                     {history.map((c) =>
                                       contributionEditId === c.id ? (
-                                        <li key={c.id} className="pay-editing">
+                                        <li key={c.id}>
                                           <form className="row-edit pay-form" onSubmit={(e) => saveContribution(e, goal, c)}>
                                             {contributionFields(c)}
                                             <div className="row-edit-actions">
