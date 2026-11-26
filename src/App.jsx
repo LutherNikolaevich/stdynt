@@ -1472,8 +1472,10 @@ export default function App() {
     [data.expenses, data.income, historySort]
   );
   const setHistorySort = (sort) => {
-    setData((d) => ({ ...d, prefs: { ...d.prefs, historySort: sort } }));
-    setHistoryPages(1);
+    runRowTransition(() => {
+      setData((d) => ({ ...d, prefs: { ...d.prefs, historySort: sort } }));
+      setHistoryPages(1);
+    });
   };
 
   const historyNeedle = historyQuery.trim().toLowerCase();
@@ -1492,9 +1494,11 @@ export default function App() {
     ...new Set([...categories.map((c) => c.name), ...data.expenses.map((e) => e.category).filter(Boolean)])
   ];
   const setHistoryFilter = (query, cat) => {
-    setHistoryQuery(query);
-    setHistoryCat(cat);
-    setHistoryPages(1);
+    runRowTransition(() => {
+      setHistoryQuery(query);
+      setHistoryCat(cat);
+      setHistoryPages(1);
+    });
   };
 
   const historyDays = [];
@@ -1741,6 +1745,35 @@ export default function App() {
     }
   };
 
+  const nameVisibleRows = () => {
+    const seen = new Map();
+    document.querySelectorAll('[data-row]').forEach((el) => {
+      const box = el.getBoundingClientRect();
+      if (box.bottom < 0 || box.top > window.innerHeight) return;
+      const id = el.dataset.row;
+      const n = seen.get(id) || 0;
+      seen.set(id, n + 1);
+      el.style.viewTransitionName = `row-${id}-${n}`;
+    });
+  };
+  const clearRowNames = () => {
+    document.querySelectorAll('[data-row]').forEach((el) => {
+      el.style.viewTransitionName = '';
+    });
+  };
+
+  const runRowTransition = (commit) => {
+    if (prefersReducedMotion() || !document.startViewTransition) {
+      commit();
+      return Promise.resolve();
+    }
+    nameVisibleRows();
+    return runViewTransition('rows', () => {
+      commit();
+      nameVisibleRows();
+    }).finally(clearRowNames);
+  };
+
   const strikeOut = (id, commit) => {
     const els = [...document.querySelectorAll(`[data-row="${id}"]`)];
     if (els.length === 0 || prefersReducedMotion()) {
@@ -1749,20 +1782,7 @@ export default function App() {
     }
     if (els[0].classList.contains('row-strike')) return;
     els.forEach((el) => el.classList.add('row-strike'));
-    setTimeout(() => {
-      const named = [];
-      document.querySelectorAll('[data-row]').forEach((el, i) => {
-        const box = el.getBoundingClientRect();
-        if (box.bottom < 0 || box.top > window.innerHeight) return;
-        el.style.viewTransitionName = `row-${el.dataset.row}-${i}`;
-        named.push(el);
-      });
-      runViewTransition('rows', commit).finally(() => {
-        named.forEach((el) => {
-          el.style.viewTransitionName = '';
-        });
-      });
-    }, 220);
+    setTimeout(() => runRowTransition(commit), 220);
   };
 
   const flashRow = (id) => {
@@ -4070,7 +4090,7 @@ export default function App() {
                     ['paid', 'Paid']
                   ].map(([value, label]) => (
                     <label key={value}>
-                      <input type="radio" name="loanFilter" value={value} checked={loanFilter === value} onChange={() => setLoanFilter(value)} />
+                      <input type="radio" name="loanFilter" value={value} checked={loanFilter === value} onChange={() => runRowTransition(() => setLoanFilter(value))} />
                       <span>
                         {label}
                         {value !== 'all' && loanCounts[value] > 0 && <small className="num">{loanCounts[value]}</small>}
