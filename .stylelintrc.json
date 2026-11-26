@@ -1,0 +1,18 @@
+{
+  "extends": ["stylelint-config-standard-scss"],
+  "ignoreFiles": ["dist/**", "node_modules/**"],
+  "rules": {
+    "property-no-vendor-prefix": [
+      true,
+      {
+        "ignoreProperties": [
+          "-moz-appearance",
+          "-webkit-appearance",
+          "-webkit-backdrop-filter",
+          "-webkit-text-size-adjust",
+          "-webkit-user-select"
+        ]
+      }
+    ]
+  }
+}
