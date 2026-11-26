@@ -2795,3 +2795,191 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Paper gets the numbers, not the app chrome: a light high-contrast palette,
+   no navigation, sheets or toasts, and cards that don't split across pages.
+   Everything else is hidden rather than re-laid out. */
+@media print {
+  @page {
+    margin: 14mm 12mm;
+  }
+
+  :root {
+    color-scheme: light;
+
+    --ground: #fff;
+    --ground-deep: #fff;
+    --surface-1: #fff;
+    --surface-2: #fff;
+    --surface-3: #f2f2f2;
+    --panel: #fff;
+    --panel-2: #fff;
+    --panel-line: #ccc;
+    --line: #bbb;
+    --text-1: #111;
+    --text: #111;
+    --text-2: #3b3b3b;
+    --text-3: #555;
+    --accent-money: #6d5a29;
+    --sun: #6d5a29;
+    --accent-debt: #9c2417;
+    --red: #9c2417;
+    --accent-warn: #8a5400;
+    --warn: #8a5400;
+    --warn-dark: #8a5400;
+    --warn-bar: #8a5400;
+    --over-bar: #9c2417;
+    --field-bg: #fff;
+    --field-bg-focus: #fff;
+    --field-border: #888;
+    --control-border: #888;
+    --placeholder: #666;
+    --wash-3: rgb(0 0 0 / 3%);
+    --wash-4: rgb(0 0 0 / 4%);
+    --wash-5: rgb(0 0 0 / 5%);
+    --wash-6: rgb(0 0 0 / 6%);
+    --wash-8: rgb(0 0 0 / 8%);
+    --wash-10: rgb(0 0 0 / 10%);
+    --wash-18: rgb(0 0 0 / 18%);
+    --wash-30: rgb(0 0 0 / 30%);
+    --wash-danger: rgb(156 36 23 / 12%);
+    --rim-1: rgb(0 0 0 / 18%);
+    --rim-2: rgb(0 0 0 / 6%);
+    --rim: var(--rim-1);
+    --rim-soft: var(--rim-2);
+    --highlight: rgb(255 255 255 / 50%);
+    --highlight-soft: rgb(255 255 255 / 40%);
+    --sheen: none;
+    --grain: none;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111;
+  }
+
+  body {
+    font-size: 11pt;
+    line-height: 1.4;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .topbar,
+  .rail,
+  .fab,
+  .fab-actions,
+  .bottom-nav,
+  .toast,
+  dialog,
+  .nav-kbd,
+  .sort-seg,
+  .chips,
+  .fold-chev,
+  .day-chev {
+    display: none !important;
+  }
+
+  .app {
+    display: block;
+    min-height: 0;
+    max-width: none;
+    padding: 0;
+  }
+
+  .main {
+    padding-top: 0;
+    gap: 12px;
+  }
+
+  .pane {
+    gap: 12px;
+    view-transition-name: none;
+  }
+
+  .card {
+    background: #fff !important;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .slip {
+    background: #fff !important;
+    border: 1px solid #ccc;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .well,
+  .intro-well {
+    min-height: 0;
+    padding: 12px 14px 10px;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .well::before,
+  .well::after,
+  .well-liquid {
+    display: none !important;
+  }
+
+  .date-stamp,
+  .today-label {
+    color: var(--text-2);
+  }
+
+  .stamp {
+    padding-top: 8px;
+    font-size: 2.5rem;
+  }
+
+  .stamp.digits-lg {
+    font-size: 2rem;
+  }
+
+  .stamp.digits-xl {
+    font-size: 1.5rem;
+  }
+
+  .ledger-head,
+  .ledger-row,
+  .day-head,
+  .day-rows,
+  .list-row,
+  .card-list li,
+  .day-card,
+  .history,
+  .goals,
+  .fold,
+  .fold-body {
+    break-inside: avoid;
+  }
+
+  .ledger-row,
+  .list-row {
+    border-bottom: 1px solid #e3e3e3;
+  }
+
+  .donut,
+  .goal-bar,
+  .cat-dot {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+}
