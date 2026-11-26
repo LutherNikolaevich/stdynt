@@ -4,7 +4,7 @@
    at equal specificity, so component rules override the baseline without
    out-specifying it or reaching for !important. */
 
-@layer reset, base, components, utilities;
+@layer reset, base, components, deferred, utilities;
 
 /* Cross-browser baseline, pinned to the lowest layer. */
 @import 'modern-normalize/modern-normalize.css' layer(reset);
@@ -89,19 +89,19 @@
 @property --rise {
   syntax: '<length>';
   inherits: true;
-  initial-value: 8px;
+  initial-value: 0.5rem;
 }
 
 @property --nav-h {
   syntax: '<length>';
   inherits: true;
-  initial-value: 72px;
+  initial-value: 4.5rem;
 }
 
 @property --rail-w {
   syntax: '<length>';
   inherits: true;
-  initial-value: 184px;
+  initial-value: 11.5rem;
 }
 
 @property --stamp-stretch {
@@ -114,98 +114,98 @@
 @property --space-1 {
   syntax: '<length>';
   inherits: true;
-  initial-value: 4px;
+  initial-value: 0.25rem;
 }
 
 @property --space-2 {
   syntax: '<length>';
   inherits: true;
-  initial-value: 8px;
+  initial-value: 0.5rem;
 }
 
 @property --space-3 {
   syntax: '<length>';
   inherits: true;
-  initial-value: 12px;
+  initial-value: 0.75rem;
 }
 
 @property --space-4 {
   syntax: '<length>';
   inherits: true;
-  initial-value: 16px;
+  initial-value: 1rem;
 }
 
 @property --space-5 {
   syntax: '<length>';
   inherits: true;
-  initial-value: 20px;
+  initial-value: 1.25rem;
 }
 
 @property --space-6 {
   syntax: '<length>';
   inherits: true;
-  initial-value: 24px;
+  initial-value: 1.5rem;
 }
 
 @property --space-7 {
   syntax: '<length>';
   inherits: true;
-  initial-value: 32px;
+  initial-value: 2rem;
 }
 
 @property --space-8 {
   syntax: '<length>';
   inherits: true;
-  initial-value: 40px;
+  initial-value: 2.5rem;
 }
 
 @property --space-9 {
   syntax: '<length>';
   inherits: true;
-  initial-value: 56px;
+  initial-value: 3.5rem;
 }
 
 /* Corner radii. */
 @property --radius-2xs {
   syntax: '<length>';
   inherits: true;
-  initial-value: 4px;
+  initial-value: 0.25rem;
 }
 
 @property --radius-xs {
   syntax: '<length>';
   inherits: true;
-  initial-value: 6px;
+  initial-value: 0.375rem;
 }
 
 @property --radius-sm {
   syntax: '<length>';
   inherits: true;
-  initial-value: 8px;
+  initial-value: 0.5rem;
 }
 
 @property --radius-md {
   syntax: '<length>';
   inherits: true;
-  initial-value: 12px;
+  initial-value: 0.75rem;
 }
 
 @property --radius-lg {
   syntax: '<length>';
   inherits: true;
-  initial-value: 16px;
+  initial-value: 1rem;
 }
 
 @property --radius-xl {
   syntax: '<length>';
   inherits: true;
-  initial-value: 20px;
+  initial-value: 1.25rem;
 }
 
 @property --radius-2xl {
   syntax: '<length>';
   inherits: true;
-  initial-value: 24px;
+  initial-value: 1.5rem;
 }
 
 @property --radius-pill {
@@ -295,24 +295,24 @@
     --text-h1: 1.75rem;
 
     /* Spacing scale, 4px base. */
-    --space-1: 4px;
-    --space-2: 8px;
-    --space-3: 12px;
-    --space-4: 16px;
-    --space-5: 20px;
-    --space-6: 24px;
-    --space-7: 32px;
-    --space-8: 40px;
-    --space-9: 56px;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-7: 2rem;
+    --space-8: 2.5rem;
+    --space-9: 3.5rem;
 
     /* Corner radii. */
-    --radius-2xs: 4px;
-    --radius-xs: 6px;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
-    --radius-2xl: 24px;
+    --radius-2xs: 0.25rem;
+    --radius-xs: 0.375rem;
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+    --radius-2xl: 1.5rem;
     --radius-pill: 999px;
     --stamp-stretch: 88%;
     --glass-tint: color-mix(in oklab, var(--ground-deep) 84%, transparent);
@@ -339,9 +339,9 @@
     --dur-enter: 460ms;
     --dur-exit: 200ms;
     --ease-paper: cubic-bezier(0.22, 0.9, 0.24, 1);
-    --rise: 8px;
-    --nav-h: 72px;
-    --rail-w: clamp(184px, 18vw, 216px); /* grows with the window; never squeezes the card */
+    --rise: 0.5rem;
+    --nav-h: 4.5rem;
+    --rail-w: clamp(11.5rem, 18vw, 13.5rem); /* grows with the window; never squeezes the card */
     --safe-b: env(safe-area-inset-bottom, 0px);
 
     color-scheme: dark;
@@ -362,13 +362,13 @@
     touch-action: pan-x pan-y;
     overscroll-behavior-y: contain;
     scrollbar-color: var(--control-border) var(--ground-deep);
-    scroll-padding-top: calc(72px + env(safe-area-inset-top, 0px));
-    scroll-padding-bottom: calc(var(--nav-h) + 88px + var(--safe-b));
+    scroll-padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
+    scroll-padding-bottom: calc(var(--nav-h) + 5.5rem + var(--safe-b));
   }
 
   @media (width >= 1000px) {
     html {
-      scroll-padding-top: 96px;
+      scroll-padding-top: 6rem;
       scroll-padding-bottom: var(--space-6);
     }
   }
@@ -377,7 +377,7 @@
     background: var(--ground);
     color: var(--text);
     font-family: var(--font-ui);
-    font-size: 16px;
+    font-size: 1rem;
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
@@ -498,20 +498,20 @@
     display: block;
     max-width: 34ch;
     margin: 0 auto;
-    padding: calc(48px + env(safe-area-inset-top, 0px)) 24px 24px;
+    padding: calc(3rem + env(safe-area-inset-top, 0px)) 1.5rem 1.5rem;
     font-weight: 600;
     text-wrap: balance;
   }
 
   .app {
     min-height: 100dvh;
-    max-width: 560px;
+    max-width: 35rem;
     margin: 0 auto;
-    padding: 0 16px calc(var(--nav-h) + 96px + var(--safe-b));
+    padding: 0 1rem calc(var(--nav-h) + 6rem + var(--safe-b));
   }
 
   .app.view-settings {
-    padding-bottom: calc(32px + var(--safe-b));
+    padding-bottom: calc(2rem + var(--safe-b));
   }
 
   .topbar {
@@ -521,9 +521,9 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    height: calc(60px + env(safe-area-inset-top, 0px));
-    margin: 0 -16px;
-    padding: env(safe-area-inset-top, 0) 20px 0;
+    height: calc(3.75rem + env(safe-area-inset-top, 0px));
+    margin: 0 -1rem;
+    padding: env(safe-area-inset-top, 0) 1.25rem 0;
     background: var(--ground);
     transition:
       background-color 240ms var(--ease-standard),
@@ -593,17 +593,17 @@
   .icon-btn {
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
-    margin-inline-end: -12px;
-    border-radius: 10px;
+    width: 3rem;
+    height: 3rem;
+    margin-inline-end: -0.75rem;
+    border-radius: 0.625rem;
     color: var(--text);
     transition: background-color var(--dur-ui) ease, transform 0.3s var(--spring), color var(--dur-ui) ease;
   }
 
   .back-btn {
     margin-block: 0;
-    margin-inline: -10px 0;
+    margin-inline: -0.625rem 0;
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -727,8 +727,8 @@
     isolation: isolate;
     display: flex;
     flex-direction: column;
-    min-height: clamp(232px, 64cqi, 340px);
-    padding: 18px var(--space-5) 14px;
+    min-height: clamp(14.5rem, 64cqi, 21.25rem);
+    padding: 1.125rem var(--space-5) 0.875rem;
     background:
       radial-gradient(120% 80% at 20% 0%, oklch(96% 0.017 92deg / 5.5%), oklch(96% 0.017 92deg / 0%) 60%),
       var(--ground-deep);
@@ -813,7 +813,7 @@
     font-size: var(--text-body);
     font-weight: 600;
     line-height: 1.3;
-    padding-inline-end: 84px;
+    padding-inline-end: 5.25rem;
   }
 
   .well .date-stamp {
@@ -859,7 +859,7 @@
   }
 
   .budget-setup-box {
-    margin-top: 10px;
+    margin-top: 0.625rem;
   }
 
   .budget-setup-box p {
@@ -894,8 +894,8 @@
 
   .date-stamp {
     position: absolute;
-    top: 18px;
-    inset-inline-end: 20px;
+    top: 1.125rem;
+    inset-inline-end: 1.25rem;
     font-family: var(--font-stamp);
     font-stretch: var(--stamp-stretch);
     font-weight: 700;
@@ -945,7 +945,7 @@
   .ledger-head span:first-child,
   .ledger-row .d {
     flex: none;
-    width: 56px;
+    width: 3.5rem;
   }
 
   .ledger-head span:nth-child(2),
@@ -960,12 +960,12 @@
 
   .ledger-head.ledger-sub {
     border-top: 1px solid var(--panel-line);
-    padding-top: 10px;
+    padding-top: 0.625rem;
   }
 
   .ledger-fold {
     width: 100%;
-    min-height: 48px;
+    min-height: 3rem;
     padding-block: 0;
     text-align: start;
     cursor: pointer;
@@ -1005,7 +1005,7 @@
   }
 
   .ledger-row {
-    min-height: 48px;
+    min-height: 3rem;
     border-top: 1px solid var(--panel-line);
     font-size: var(--text-ui);
     transition: background-color var(--dur-ui) ease;
@@ -1038,14 +1038,14 @@
     align-items: center;
     gap: var(--space-2);
     align-self: stretch;
-    min-height: 48px;
+    min-height: 3rem;
     text-align: start;
   }
 
   .list-row .row-open {
     gap: var(--space-3);
     padding-inline: var(--space-2);
-    margin-inline: -8px;
+    margin-inline: -0.5rem;
   }
 
   .row-open {
@@ -1094,7 +1094,7 @@
   }
 
   .mini-stamp {
-    padding: 0 9px;
+    padding: 0 0.5625rem;
     border: 1.5px solid var(--sun);
     border-radius: var(--radius-pill);
     color: var(--sun);
@@ -1123,9 +1123,9 @@
     flex: none;
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
-    margin-inline-end: -12px;
+    width: 3rem;
+    height: 3rem;
+    margin-inline-end: -0.75rem;
     border-radius: var(--radius-sm);
     color: var(--text-2);
     transition: background-color var(--dur-ui) ease, color var(--dur-ui) ease, transform 0.35s var(--spring);
@@ -1146,7 +1146,7 @@
   }
 
   .ledger-empty {
-    padding: 14px var(--space-4) var(--space-4);
+    padding: 0.875rem var(--space-4) var(--space-4);
     border-top: 1px solid var(--panel-line);
     font-size: var(--text-ui);
     color: var(--text-2);
@@ -1185,7 +1185,7 @@
 
   .month-bar {
     position: relative;
-    height: 6px;
+    height: 0.375rem;
     margin-top: var(--space-2);
     border-radius: 3px;
     background: var(--surface-3);
@@ -1243,7 +1243,7 @@
 
   .month-figure:not(:last-child)::after {
     content: '·';
-    margin: 0 6px;
+    margin: 0 0.375rem;
     color: var(--text-3);
   }
 
@@ -1254,8 +1254,8 @@
   .slip {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 14px var(--space-4);
+    gap: 0.625rem;
+    padding: 0.875rem var(--space-4);
     border-radius: var(--radius-lg);
     background: var(--panel);
     color: var(--text);
@@ -1293,11 +1293,11 @@
   }
 
   .main > .live-slot:empty {
-    margin-bottom: -16px;
+    margin-bottom: -1rem;
   }
 
   .storage-slip {
-    padding: 14px var(--space-4);
+    padding: 0.875rem var(--space-4);
   }
 
   .slip-body {
@@ -1315,9 +1315,9 @@
 
   .slip-actions .btn,
   .slip-actions .btn.danger {
-    flex: 1 1 140px;
+    flex: 1 1 8.75rem;
     margin-top: 0;
-    padding: 0 14px;
+    padding: 0 0.875rem;
     white-space: nowrap;
   }
 
@@ -1345,11 +1345,11 @@
   .text-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-height: 48px;
-    height: 48px;
+    gap: 0.375rem;
+    min-height: 3rem;
+    height: 3rem;
     padding: 0 var(--space-2);
-    margin-inline-end: -10px;
+    margin-inline-end: -0.625rem;
     border-radius: var(--radius-sm);
     font-weight: 600;
     font-size: var(--text-ui);
@@ -1379,7 +1379,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    min-height: 48px;
+    min-height: 3rem;
     padding: 0 var(--space-1);
     border-top: 1px solid var(--line);
   }
@@ -1426,7 +1426,7 @@
     }
 
     .list-row .row-open {
-      padding-block: 6px;
+      padding-block: 0.375rem;
     }
   }
 
@@ -1446,9 +1446,9 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    width: calc(100% + 8px);
-    min-height: 48px;
-    margin-inline: -4px;
+    width: calc(100% + 0.5rem);
+    min-height: 3rem;
+    margin-inline: -0.25rem;
     padding: 0 var(--space-2);
     border-radius: var(--radius-xs);
     text-align: start;
@@ -1496,7 +1496,7 @@
 
   .day-chev {
     flex: none;
-    width: 34px;
+    width: 2.125rem;
     color: var(--text-2);
     transform: rotate(-90deg);
     transition: transform var(--dur-ui) var(--ease-out);
@@ -1522,7 +1522,7 @@
     justify-content: center;
     gap: var(--space-2);
     width: 100%;
-    min-height: 48px;
+    min-height: 3rem;
     border-top: 1px solid var(--line);
     font-weight: 600;
     font-size: var(--text-ui);
@@ -1573,8 +1573,8 @@
 
   .cat-dot {
     flex: none;
-    width: 10px;
-    height: 10px;
+    width: 0.625rem;
+    height: 0.625rem;
     border-radius: 50%;
     box-shadow: 0 0 0 2px var(--ground);
   }
@@ -1583,6 +1583,10 @@
     padding: var(--space-4) var(--space-1);
     border-top: 1px solid var(--line);
     color: var(--text-2);
+  }
+
+  .cat-card {
+    container: cat / inline-size;
   }
 
   .cat-layout {
@@ -1603,7 +1607,7 @@
 
   .donut {
     display: block;
-    width: min(260px, 76%);
+    width: min(16.25rem, 76%);
     margin: var(--space-5) auto var(--space-1);
     overflow: visible;
   }
@@ -1661,7 +1665,7 @@
 
   .donut-k {
     font-family: var(--font-ui);
-    font-size: 11px;
+    font-size: 0.6875rem;
     font-weight: 600;
     fill: var(--text-2);
   }
@@ -1669,14 +1673,14 @@
   .donut-v {
     font-family: var(--font-stamp);
     font-stretch: var(--stamp-stretch);
-    font-size: 26px;
+    font-size: 1.625rem;
     font-weight: 700;
     fill: var(--text);
   }
 
   .donut-a {
     font-family: var(--font-ui);
-    font-size: 10px;
+    font-size: 0.625rem;
     font-weight: 600;
     fill: var(--text-2);
     font-variant-numeric: tabular-nums;
@@ -1742,12 +1746,12 @@
 
   .legend-btn {
     display: grid;
-    grid-template-columns: 18px minmax(0, 1fr) auto 48px;
+    grid-template-columns: 1.125rem minmax(0, 1fr) auto 3rem;
     align-items: center;
     column-gap: var(--space-2);
     width: 100%;
-    min-height: 52px;
-    padding: var(--space-2) 6px;
+    min-height: 3.25rem;
+    padding: var(--space-2) 0.375rem;
     border-radius: var(--radius-xs);
     text-align: start;
     transition: background-color var(--dur-ui) ease;
@@ -1823,7 +1827,7 @@
   }
 
   .today {
-    container-type: inline-size;
+    container: today / inline-size;
   }
 
   .cat-dot.income-dot {
@@ -1847,7 +1851,7 @@
     flex: 1 1 0;
     align-items: center;
     justify-content: center;
-    min-height: 48px;
+    min-height: 3rem;
     border-radius: var(--radius-pill);
     font-weight: 600;
     font-size: var(--text-body-sm);
@@ -1904,7 +1908,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 48px;
+    min-height: 3rem;
     border-radius: var(--radius-pill);
     font-weight: 600;
     font-size: var(--text-ui);
@@ -1932,22 +1936,22 @@
   }
 
   .cat-list li {
-    gap: 10px;
+    gap: 0.625rem;
   }
 
   .swatch {
     flex: none;
     position: relative;
-    width: 48px;
-    height: 48px;
-    margin-inline-start: -10px;
+    width: 3rem;
+    height: 3rem;
+    margin-inline-start: -0.625rem;
     border-radius: 50%;
   }
 
   .swatch::after {
     content: '';
     position: absolute;
-    inset: 12px;
+    inset: 0.75rem;
     border-radius: 50%;
     background: var(--c);
     box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--c);
@@ -1967,7 +1971,7 @@
   .cat-head {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.625rem;
     margin-top: var(--space-4);
     padding-bottom: var(--space-1);
     font-size: var(--text-label);
@@ -1976,7 +1980,7 @@
   }
 
   .cat-head span:first-child {
-    width: 36px;
+    width: 2.25rem;
   }
 
   .cat-head span:nth-child(2) {
@@ -1985,7 +1989,7 @@
   }
 
   .cat-head span:last-child {
-    margin-inline-end: 36px;
+    margin-inline-end: 2.25rem;
   }
 
   .cat-head + .card-list {
@@ -1995,9 +1999,9 @@
   .cat-name {
     flex: 1 1 0;
     min-width: 0;
-    height: 48px;
+    height: 3rem;
     padding: 0 var(--space-2);
-    margin-inline-start: -8px;
+    margin-inline-start: -0.5rem;
     border: 1.5px solid transparent;
     border-bottom: 1.5px dashed var(--control-border);
     border-radius: var(--radius-xs) var(--radius-xs) 0 0;
@@ -2053,7 +2057,7 @@
     display: block;
     width: 100%;
     min-width: 0;
-    height: 48px;
+    height: 3rem;
     padding: 0 var(--space-3);
     border: 1.5px solid var(--field-border);
     border-radius: var(--radius-md);
@@ -2068,7 +2072,7 @@
   .field input[type='time'] {
     -webkit-appearance: none;
     appearance: none;
-    line-height: 46px;
+    line-height: 2.875rem;
     text-align: start;
   }
 
@@ -2100,19 +2104,19 @@
   }
 
   .field.amount {
-    width: 110px;
+    width: 6.875rem;
   }
 
   .add-form {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 10px;
+    gap: 0.625rem;
     margin-top: var(--space-4);
   }
 
   .add-form .field.grow {
-    flex: 1 1 140px;
+    flex: 1 1 8.75rem;
   }
 
   /* Content-sized buttons don't grow; the flexible fields around them take
@@ -2129,7 +2133,7 @@
   .settings-form {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 1.125rem;
     margin-top: var(--space-4);
   }
 
@@ -2170,8 +2174,8 @@
     gap: var(--space-1);
     white-space: nowrap;
     flex: 1 1 0;
-    min-height: 48px;
-    height: 48px;
+    min-height: 3rem;
+    height: 3rem;
     border-radius: var(--radius-pill);
     font-weight: 600;
     font-size: var(--text-body-sm);
@@ -2202,9 +2206,9 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    min-height: 48px;
-    height: 48px;
-    padding: 0 22px;
+    min-height: 3rem;
+    height: 3rem;
+    padding: 0 1.375rem;
     border-radius: var(--radius-pill);
     font-weight: 700;
     font-size: var(--text-body-sm);
@@ -2261,8 +2265,8 @@
   }
 
   .btn.big {
-    min-height: 56px;
-    height: 56px;
+    min-height: 3.5rem;
+    height: 3.5rem;
     font-size: var(--text-body-lg);
   }
 
@@ -2292,7 +2296,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    min-height: 54px;
+    min-height: 3.375rem;
     border-top: 1px solid var(--panel-line);
   }
 
@@ -2313,9 +2317,9 @@
   }
 
   .settle {
-    min-height: 48px;
-    height: 48px;
-    padding: 0 14px;
+    min-height: 3rem;
+    height: 3rem;
+    padding: 0 0.875rem;
     border: 1.5px solid var(--text);
     border-radius: var(--radius-pill);
     color: var(--text);
@@ -2353,7 +2357,7 @@
     display: grid;
     grid-template-rows: subgrid;
     grid-row: span 2;
-    padding: 10px 0 0;
+    padding: 0.625rem 0 0;
     min-width: 0;
   }
 
@@ -2392,7 +2396,7 @@
 
   .accounts-math > div:first-child {
     grid-column: 1 / -1;
-    padding-bottom: 10px;
+    padding-bottom: 0.625rem;
   }
 
   .accounts-math > div:first-child dd {
@@ -2423,7 +2427,7 @@
   }
 
   .today-math > div:nth-child(n + 3) {
-    margin-top: 10px;
+    margin-top: 0.625rem;
     border-top: 1.5px solid var(--panel-line);
   }
 
@@ -2442,11 +2446,11 @@
   }
 
   .field.account {
-    flex: 1 1 150px;
+    flex: 1 1 9.375rem;
   }
 
   .field.balance {
-    flex: 1 1 130px;
+    flex: 1 1 8.125rem;
   }
 
   .row-edit > .hint {
@@ -2460,11 +2464,11 @@
   }
 
   .transfers .card-list {
-    margin-top: 10px;
+    margin-top: 0.625rem;
   }
 
   .transfers .card-list li {
-    padding: 6px 0;
+    padding: 0.375rem 0;
   }
 
   .transfers .card-list li:first-child {
@@ -2475,7 +2479,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: 6px;
+    column-gap: 0.375rem;
   }
 
   .transfer-route svg {
@@ -2484,13 +2488,13 @@
   }
 
   .transfers-more {
-    margin: 4px 0 0 -8px;
+    margin: 0.25rem 0 0 -0.5rem;
   }
 
   .transfer-sides {
     display: flex;
     align-items: flex-end;
-    gap: 6px;
+    gap: 0.375rem;
     flex-basis: 100%;
   }
 
@@ -2498,8 +2502,8 @@
     flex: none;
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
+    width: 3rem;
+    height: 3rem;
     margin-bottom: 1px;
     border: 1.5px solid var(--panel-line);
     border-radius: var(--radius-pill);
@@ -2522,7 +2526,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 10px;
+    gap: 0.625rem;
   }
 
   .account-chips legend {
@@ -2532,16 +2536,16 @@
   .fab {
     position: fixed;
     left: 50%;
-    bottom: calc(var(--nav-h) + 16px + var(--safe-b));
+    bottom: calc(var(--nav-h) + 1rem + var(--safe-b));
     translate: -50% 0;
-    width: min(528px, calc(100% - 32px));
+    width: min(33rem, calc(100% - 2rem));
     z-index: 20;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    min-height: 56px;
-    height: 56px;
+    gap: 0.625rem;
+    min-height: 3.5rem;
+    height: 3.5rem;
     border-radius: var(--radius-pill);
     background: var(--text);
     color: var(--ground);
@@ -2593,9 +2597,9 @@
   .fab-action {
     display: flex;
     align-items: center;
-    gap: 10px;
-    height: 56px;
-    padding: 0 18px 0 var(--space-4);
+    gap: 0.625rem;
+    height: 3.5rem;
+    padding: 0 1.125rem 0 var(--space-4);
     border-radius: var(--radius-pill);
     background: var(--text);
     color: var(--ground);
@@ -2626,9 +2630,9 @@
   @media (width <= 999px) {
     .fab-actions {
       position: fixed;
-      left: calc(100% - 16px);
+      left: calc(100% - 1rem);
       translate: -100% 0;
-      bottom: calc(var(--nav-h) + 16px + var(--safe-b) + 72px);
+      bottom: calc(var(--nav-h) + 1rem + var(--safe-b) + 4.5rem);
       z-index: 20;
     }
   }
@@ -2638,9 +2642,9 @@
       transition: background-color var(--dur-ui) ease, scale 0.4s var(--spring), box-shadow var(--dur-ui) ease,
         width 0.45s var(--spring-soft), left 0.45s var(--spring-soft), translate 0.45s var(--spring-soft),
         gap 0.3s ease;
-      left: calc(100% - 16px);
+      left: calc(100% - 1rem);
       translate: -100% 0;
-      width: 56px;
+      width: 3.5rem;
       gap: 0;
     }
   }
@@ -2654,17 +2658,17 @@
 
   .bottom-nav {
     position: fixed;
-    left: max(12px, env(safe-area-inset-left, 0px));
-    right: max(12px, env(safe-area-inset-right, 0px));
-    bottom: calc(10px + var(--safe-b));
+    left: max(0.75rem, env(safe-area-inset-left, 0px));
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    bottom: calc(0.625rem + var(--safe-b));
     z-index: 10;
     display: flex;
     align-items: stretch;
     width: auto;
-    max-width: 480px;
-    height: 66px;
+    max-width: 30rem;
+    height: 4.125rem;
     margin: 0 auto;
-    padding: 6px;
+    padding: 0.375rem;
     border: 1px solid var(--line);
     border-radius: var(--radius-2xl);
     background: var(--ground-deep);
@@ -2673,7 +2677,7 @@
       0 2px 6px -2px var(--shadow-color-35),
       0 14px 32px -12px var(--shadow-color-55);
 
-    --tab-radius: 18px;
+    --tab-radius: 1.125rem;
 
     animation: nav-in 0.6s var(--spring-soft) both;
   }
@@ -2681,11 +2685,10 @@
   .bottom-nav::before {
     content: '';
     position: absolute;
-    left: 50%;
+    inset-inline: calc(-1 * max(0.75rem, env(safe-area-inset-left, 0px)))
+      calc(-1 * max(0.75rem, env(safe-area-inset-right, 0px)));
     bottom: 100%;
-    width: 100vw;
-    height: 48px;
-    margin-left: -50vw;
+    height: 3rem;
     background: linear-gradient(to bottom, oklch(24% 0.031 166deg / 0%), oklch(24% 0.031 166deg / 55%));
     pointer-events: none;
   }
@@ -2742,7 +2745,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 26px;
+    height: 1.625rem;
     transition: transform 0.5s var(--spring);
   }
 
@@ -2897,18 +2900,18 @@
 
   .main {
     padding-top: 0;
-    gap: 12px;
+    gap: 0.75rem;
   }
 
   .pane {
-    gap: 12px;
+    gap: 0.75rem;
     view-transition-name: none;
   }
 
   .card {
     background: #fff !important;
     border: 1px solid #ccc;
-    border-radius: 8px;
+    border-radius: 0.5rem;
     box-shadow: none !important;
     break-inside: avoid;
   }
@@ -2923,7 +2926,7 @@
   .well,
   .intro-well {
     min-height: 0;
-    padding: 12px 14px 10px;
+    padding: 0.75rem 0.875rem 0.625rem;
     background: #fff !important;
     box-shadow: none !important;
   }
@@ -2940,7 +2943,7 @@
   }
 
   .stamp {
-    padding-top: 8px;
+    padding-top: 0.5rem;
     font-size: 2.5rem;
   }
 
