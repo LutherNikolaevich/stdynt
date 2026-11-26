@@ -4,6 +4,7 @@ import { transform as minifyCss } from 'lightningcss';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib';
 
 // Replaced by inlineCriticalCss with the hash of the inlined <style> block.
 const STYLE_HASH = '__CRITICAL_CSS_HASH__';
@@ -30,13 +31,14 @@ const contentSecurityPolicy = () => ({
   ]
 });
 
+const walk = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)]
+  );
+
 const precacheManifest = () => {
   let outDir = 'dist';
   let swTemplate = 'public/sw.js';
-  const walk = (dir) =>
-    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-      entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)]
-    );
   return {
     name: 'stdynt-precache',
     apply: 'build',
@@ -48,7 +50,14 @@ const precacheManifest = () => {
       const swPath = join(outDir, 'sw.js');
       const hash = createHash('sha256');
       const urls = walk(outDir)
-        .filter((file) => file !== swPath && !file.endsWith('.map') && !file.startsWith(join(outDir, 'splash')))
+        .filter(
+          (file) =>
+            file !== swPath &&
+            !file.endsWith('.map') &&
+            !file.endsWith('.gz') &&
+            !file.endsWith('.br') &&
+            !file.startsWith(join(outDir, 'splash'))
+        )
         .sort()
         .map((file) => {
           const url = `./${relative(outDir, file).split(sep).join('/')}`;
@@ -154,6 +163,30 @@ const inlineCriticalCss = () => {
   };
 };
 
+const precompress = () => {
+  let outDir = 'dist';
+  const compressible = /\.(?:css|html|js|json|svg|txt|webmanifest)$/;
+  return {
+    name: 'stdynt-precompress',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    writeBundle() {
+      for (const file of walk(outDir)) {
+        if (!compressible.test(file)) continue;
+        const source = readFileSync(file);
+        const gzip = gzipSync(source, { level: 9 });
+        if (gzip.length < source.length) writeFileSync(`${file}.gz`, gzip);
+        const brotli = brotliCompressSync(source, {
+          params: { [zlibConstants.BROTLI_PARAM_QUALITY]: zlibConstants.BROTLI_MAX_QUALITY }
+        });
+        if (brotli.length < source.length) writeFileSync(`${file}.br`, brotli);
+      }
+    }
+  };
+};
+
 // The dev server hands a bare .css request back as a JS module; `?direct`
 // makes it serve the stylesheet itself, which is what a <link> needs.
 const deferredCssDev = () => ({
@@ -189,6 +222,7 @@ export default defineConfig({
     preloadFont(),
     minifyCssAssets(),
     inlineCriticalCss(),
+    precompress(),
     precacheManifest()
   ],
   server: {
