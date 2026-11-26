@@ -1,12 +1,28 @@
+import './font.css';
+import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App, { announceNewBuild } from './App.jsx';
-import '@fontsource-variable/bricolage-grotesque/wdth.css';
-import './index.css';
+
+// Critical styles are inlined in the document. The rest of the app's CSS is
+// linked with media="print" so the browser fetches it without blocking the
+// first paint; switching the media to "all" applies it once the shell is up.
+document.querySelector('link[data-deferred-css]')?.setAttribute('media', 'all');
 
 for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
   document.addEventListener(type, (event) => event.preventDefault());
 }
+
+// A long press on a touch screen asks the browser for its own menu — text
+// selection, "open link in new tab", save image — which covers the app even
+// when the text itself is not selectable. Keep the menu on text fields, where
+// it is the paste and cursor UI, and leave mouse right clicks alone.
+const TEXT_ENTRY = 'input, textarea, select, [contenteditable], [contenteditable] *';
+document.addEventListener('contextmenu', (event) => {
+  if (event.pointerType === 'mouse') return;
+  if (event.target instanceof Element && event.target.closest(TEXT_ENTRY)) return;
+  event.preventDefault();
+});
 
 const readSaved = () => {
   try {
@@ -50,8 +66,8 @@ class ErrorBoundary extends React.Component {
             display: 'grid',
             placeItems: 'center',
             padding: '24px',
-            background: '#172d24',
-            color: '#f5f0e6',
+            background: 'oklch(28% 0.037 166deg)',
+            color: 'oklch(96% 0.017 92deg)',
             fontFamily: "'Bricolage Grotesque Variable', system-ui, sans-serif"
           }}
         >
@@ -59,8 +75,8 @@ class ErrorBoundary extends React.Component {
             className="card"
             style={{
               maxWidth: '400px',
-              background: '#1e3b2f',
-              color: '#f5f0e6',
+              background: 'oklch(32% 0.042 166deg)',
+              color: 'oklch(96% 0.017 92deg)',
               padding: '24px',
               borderRadius: '16px'
             }}
@@ -68,7 +84,7 @@ class ErrorBoundary extends React.Component {
             <h1 style={{ fontWeight: 700, fontSize: '1.75rem', marginBottom: '8px' }}>
               Something went wrong
             </h1>
-            <p style={{ marginBottom: '16px', fontSize: '0.9375rem', color: '#b5bda4' }}>
+            <p style={{ marginBottom: '16px', fontSize: '0.9375rem', color: 'oklch(83% 0.03 110deg)' }}>
               {saved
                 ? 'stdynt hit a problem it could not recover from. What you saved is still on this device. Save a copy of it before trying anything else.'
                 : 'stdynt hit a problem it could not recover from.'}

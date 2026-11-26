@@ -93,34 +93,54 @@ const ZERO_DECIMAL_CURRENCIES = new Set(['¥', '₩', '₫', 'Rp']);
 
 const STORAGE_KEY = 'stdynt_data_v1';
 
-const INKS = ['#aaa2e6', '#e0a273', '#6fc3b0', '#e498ad', '#80b3e3', '#9dc97f', '#cc92ce', '#c3c577'];
-const UNKNOWN_INK = '#98a584';
+// Category inks: one shared lightness (78%) and chroma (0.1), hue only varies,
+// so no category reads heavier than another in the donut or legend.
+const INKS = [
+  'oklch(78% 0.1 289deg)',
+  'oklch(78% 0.1 58deg)',
+  'oklch(78% 0.1 177deg)',
+  'oklch(78% 0.1 2deg)',
+  'oklch(78% 0.1 248deg)',
+  'oklch(78% 0.1 133deg)',
+  'oklch(78% 0.1 325deg)',
+  'oklch(78% 0.1 110deg)'
+];
+const UNKNOWN_INK = 'oklch(70% 0.049 125deg)';
 
+// Old saves carry the previous hex palette; map each onto its new oklch ink.
 const LEGACY_INKS = {
-  '#a99bff': '#aaa2e6',
-  '#ff9f5a': '#e0a273',
-  '#3fd0b6': '#6fc3b0',
-  '#ff8fb0': '#e498ad',
-  '#5bb8ff': '#80b3e3',
-  '#8fd866': '#9dc97f',
-  '#e07be0': '#cc92ce',
-  '#c9cf5a': '#c3c577',
-  '#4b3a8c': '#aaa2e6',
-  '#57429c': '#aaa2e6',
-  '#a0681a': '#e0a273',
-  '#aa6a00': '#e0a273',
-  '#1f6f78': '#6fc3b0',
-  '#008674': '#6fc3b0',
-  '#8a4b2a': '#e498ad',
-  '#ad472e': '#e498ad',
-  '#24476b': '#80b3e3',
-  '#175d9b': '#80b3e3',
-  '#2f6b47': '#9dc97f',
-  '#316a23': '#9dc97f',
-  '#7d3c6b': '#cc92ce',
-  '#983c75': '#cc92ce',
-  '#5b6b1f': '#c3c577',
-  '#737c24': '#c3c577'
+  '#aaa2e6': INKS[0],
+  '#e0a273': INKS[1],
+  '#6fc3b0': INKS[2],
+  '#e498ad': INKS[3],
+  '#80b3e3': INKS[4],
+  '#9dc97f': INKS[5],
+  '#cc92ce': INKS[6],
+  '#c3c577': INKS[7],
+  '#a99bff': INKS[0],
+  '#ff9f5a': INKS[1],
+  '#3fd0b6': INKS[2],
+  '#ff8fb0': INKS[3],
+  '#5bb8ff': INKS[4],
+  '#8fd866': INKS[5],
+  '#e07be0': INKS[6],
+  '#c9cf5a': INKS[7],
+  '#4b3a8c': INKS[0],
+  '#57429c': INKS[0],
+  '#a0681a': INKS[1],
+  '#aa6a00': INKS[1],
+  '#1f6f78': INKS[2],
+  '#008674': INKS[2],
+  '#8a4b2a': INKS[3],
+  '#ad472e': INKS[3],
+  '#24476b': INKS[4],
+  '#175d9b': INKS[4],
+  '#2f6b47': INKS[5],
+  '#316a23': INKS[5],
+  '#7d3c6b': INKS[6],
+  '#983c75': INKS[6],
+  '#5b6b1f': INKS[7],
+  '#737c24': INKS[7]
 };
 
 const DEFAULT_CATEGORIES = [
@@ -143,7 +163,7 @@ const normalizeCategories = (raw, expenses = []) => {
     const n = String(name || '').trim().slice(0, CATEGORY_NAME_MAX);
     if (!n || seen.has(n.toLowerCase())) return;
     seen.add(n.toLowerCase());
-    const valid = typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color);
+    const valid = typeof color === 'string' && /^(#[0-9a-f]{6}|oklch\([^)]+\))$/i.test(color);
     out.push({
       id: id || `cat-${Date.now().toString(36)}-${out.length}`,
       name: n,
@@ -466,6 +486,22 @@ const runViewTransition = (kind, commit) => {
 const TAP_STRENGTH = 0.9;
 const DRAG_STRENGTH = 6;
 
+// Ask the canvas to resolve a token colour to sRGB. Tokens are authored in
+// oklch(), so measuring their digits would read L, C and H as if they were R,
+// G and B; painting one pixel gives back the real triplet.
+const resolveRgb = (() => {
+  const ctx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+  return (cssColor) => {
+    if (!ctx) return null;
+    ctx.fillStyle = '#ff00ff';
+    ctx.fillStyle = cssColor;
+    if (ctx.fillStyle === '#ff00ff') return null;
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillRect(0, 0, 1, 1);
+    return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+  };
+})();
+
 const LiquidWell = ({ level }) => {
   const canvasRef = useRef(null);
   const levelRef = useRef(level);
@@ -533,7 +569,7 @@ const LiquidWell = ({ level }) => {
       ctx.shadowBlur = 10;
       ctx.stroke(surface);
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(246, 241, 228, 0.3)';
+      ctx.strokeStyle = 'oklch(96% 0.017 92deg / 30%)';
       ctx.lineWidth = 1;
       ctx.save();
       ctx.translate(0, 1);
@@ -565,11 +601,7 @@ const LiquidWell = ({ level }) => {
       height = well.clientHeight;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       color = getComputedStyle(canvas).color;
-      const parts = color.match(/\d+(\.\d+)?/g);
-      if (parts && parts.length >= 3) {
-        const vals = parts.slice(0, 3).map(Number);
-        rgb = vals.every((v) => v <= 1) ? vals.map((v) => Math.round(v * 255)) : vals;
-      }
+      rgb = resolveRgb(color) || rgb;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       draw();
@@ -580,7 +612,7 @@ const LiquidWell = ({ level }) => {
     const onDown = (e) => {
       if (e.button > 0) return;
       dragX = across(e);
-      well.classList.add('is-stirring');
+      well.classList.add('stirring');
       pokeLiquid(liquid, dragX, TAP_STRENGTH);
       wake();
     };
@@ -595,7 +627,7 @@ const LiquidWell = ({ level }) => {
 
     const onUp = () => {
       dragX = null;
-      well.classList.remove('is-stirring');
+      well.classList.remove('stirring');
     };
 
     well.addEventListener('pointerdown', onDown);
@@ -612,7 +644,7 @@ const LiquidWell = ({ level }) => {
     });
     sight.observe(well);
 
-    well.classList.add('is-live');
+    well.classList.add('live');
     resize();
     wake();
 
@@ -626,11 +658,11 @@ const LiquidWell = ({ level }) => {
       well.removeEventListener('pointerleave', onUp);
       sizes.disconnect();
       sight.disconnect();
-      well.classList.remove('is-live', 'is-stirring');
+      well.classList.remove('live', 'stirring');
     };
   }, [reduced]);
 
-  return <canvas ref={canvasRef} className="well__liquid" aria-hidden="true" />;
+  return <canvas ref={canvasRef} className="well-liquid" aria-hidden="true" />;
 };
 
 const useTweened = (target, ms = 620) => {
@@ -668,11 +700,11 @@ function Fold({ id, label, open, onToggle, summary, className = '' }) {
       aria-controls={id}
       onClick={onToggle}
     >
-      <span className="fold__text">
-        <span className="fold__label">{label}</span>
-        {summary && !open && <small className="fold__summary">{summary}</small>}
+      <span className="fold-text">
+        <span className="fold-label">{label}</span>
+        {summary && !open && <small className="fold-summary">{summary}</small>}
       </span>
-      <span className="fold__chev">
+      <span className="fold-chev">
         <ChevronDown size={18} strokeWidth={2.25} aria-hidden="true" />
       </span>
     </button>
@@ -761,7 +793,7 @@ function MoneyFit({ parts, sym, className = '' }) {
   }, []);
   return (
     <span ref={ref} className={`money-fit ${className}`} title={tier > 0 ? full : undefined}>
-      {tier > 0 && <span className="u-sr-only">{full}</span>}
+      {tier > 0 && <span className="sr-only">{full}</span>}
       {parts.map((p, i) => (
         <span key={i} className={p.className} aria-hidden={tier > 0 ? 'true' : undefined}>
           {text(p, tier)}
@@ -795,22 +827,22 @@ const PlanFields = ({ plan, todayStr, optional }) => {
   return (
     <>
       {optional && (
-        <label className="plan-toggle u-grow-full">
+        <label className="plan-toggle grow-full">
           <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} />
           <span>Pay in installments</span>
         </label>
       )}
       {on && (
         <>
-          <label className="field field--day">
+          <label className="field day">
             <span>Payments</span>
             <input name="count" type="number" inputMode="numeric" min="1" max={INSTALLMENT_COUNT_MAX} defaultValue={plan?.count} placeholder="12" required onInput={clearValidity} />
           </label>
-          <label className="field field--amount">
+          <label className="field amount">
             <span>Each</span>
             <input name="each" type="text" inputMode="decimal" defaultValue={plan?.amount} placeholder="Even split" autoComplete="off" onInput={numericLock} />
           </label>
-          <label className="field u-grow">
+          <label className="field grow">
             <span>How often</span>
             <select name="frequency" value={frequency} onChange={pickFrequency}>
               {PLAN_FREQUENCIES.map((f) => (
@@ -821,12 +853,12 @@ const PlanFields = ({ plan, todayStr, optional }) => {
             </select>
           </label>
           {frequency === 'custom' && (
-            <label className="field field--day">
+            <label className="field day">
               <span>Every (days)</span>
               <input name="everyDays" type="number" inputMode="numeric" min="1" max={PLAN_EVERY_DAYS_MAX} defaultValue={plan?.everyDays} placeholder="10" required onInput={clearValidity} />
             </label>
           )}
-          <label className="field field--date">
+          <label className="field date">
             <span>First due</span>
             <input
               name="firstDue"
@@ -1291,7 +1323,7 @@ export default function App() {
   };
   const accountField = (selected, label = 'Account') =>
     hasAccounts && (
-      <label className="field field--account">
+      <label className="field account">
         <span>{label}</span>
         <select name="accountId" defaultValue={has(selected) ? String(selected) : ''}>
           <option value="">Cash</option>
@@ -1594,12 +1626,12 @@ export default function App() {
       setSheetDate(form.elements.date.value);
       setSheetTime(form.elements.time.value);
       setSheetNote(form.elements.note.value);
-      const pickedAccount = form.querySelector('.chips--account input:checked')?.closest('label');
-      const accountRow = pickedAccount?.closest('.chips--account');
+      const pickedAccount = form.querySelector('.account-chips input:checked')?.closest('label');
+      const accountRow = pickedAccount?.closest('.account-chips');
       if (accountRow) {
         accountRow.scrollLeft = Math.max(0, pickedAccount.offsetLeft - (accountRow.clientWidth - pickedAccount.offsetWidth) / 2);
       }
-      const recentRow = sheetRef.current?.querySelector('.recent__row');
+      const recentRow = sheetRef.current?.querySelector('.recent-row');
       if (recentRow) recentRow.scrollLeft = 0;
       amountInputRef.current?.focus();
     });
@@ -1748,8 +1780,8 @@ export default function App() {
       commit();
       return;
     }
-    if (els[0].classList.contains('is-struck')) return;
-    els.forEach((el) => el.classList.add('is-struck'));
+    if (els[0].classList.contains('row-strike')) return;
+    els.forEach((el) => el.classList.add('row-strike'));
     setTimeout(() => runRowTransition(commit), 220);
   };
 
@@ -1757,8 +1789,8 @@ export default function App() {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const els = document.querySelectorAll(`[data-row="${id}"]`);
-        els.forEach((el) => el.classList.add('is-fresh'));
-        setTimeout(() => els.forEach((el) => el.classList.remove('is-fresh')), 800);
+        els.forEach((el) => el.classList.add('row-fresh'));
+        setTimeout(() => els.forEach((el) => el.classList.remove('row-fresh')), 800);
       });
     });
   };
@@ -1916,25 +1948,25 @@ export default function App() {
       .filter(Boolean)
       .join(' · ');
     return (
-      <li key={exp.id} className={`list__row ${isIncome ? 'is-income' : ''}`} data-row={exp.id}>
+      <li key={exp.id} className="list-row" data-row={exp.id}>
         <button
           type="button"
-          className="row-button"
+          className="row-open"
           onClick={() => openSheet(exp)}
           aria-label={`Edit ${entryLabel(exp)}, ${entryAmount(exp)}`}
         >
           <span
-            className={`cat-dot ${isIncome ? 'cat-dot--income' : ''}`}
+            className={`cat-dot ${isIncome ? 'income-dot' : ''}`}
             style={isIncome ? undefined : { background: colorOf(exp.category) }}
           />
-          <span className="list__main">
+          <span className="list-main">
             <span>{entryLabel(exp)}</span>
             {meta && <small>{meta}</small>}
           </span>
-          <span className="u-num list__amount">{entryAmount(exp)}</span>
+          <span className="num amt">{entryAmount(exp)}</span>
         </button>
         <button
-          className="row-delete"
+          className="row-del"
           onClick={() => deleteExpense(exp)}
           aria-label={`Delete ${entryLabel(exp)}, ${entryAmount(exp)}`}
         >
@@ -2777,11 +2809,11 @@ export default function App() {
 
   const contributionFields = (c) => (
     <>
-      <label className="field field--amount">
+      <label className="field amount">
         <span>Amount</span>
         <input name="amount" type="text" inputMode="decimal" defaultValue={c?.amount} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={numericLock} />
       </label>
-      <label className="field field--date">
+      <label className="field date">
         <span>On</span>
         <input name="date" type="date" defaultValue={c?.date || todayStr} max={todayStr} required />
       </label>
@@ -2812,19 +2844,19 @@ export default function App() {
 
   const transferFields = (t) => (
     <>
-      <label className="field u-grow">
+      <label className="field grow">
         <span>From</span>
         <select name="fromId" defaultValue={sideValue(t.fromId)} autoFocus>
           {sideOptions()}
         </select>
       </label>
-      <label className="field u-grow">
+      <label className="field grow">
         <span>To</span>
         <select name="toId" defaultValue={sideValue(t.toId)}>
           {sideOptions()}
         </select>
       </label>
-      <label className="field field--amount">
+      <label className="field amount">
         <span>Amount</span>
         <input name="amount" type="text" inputMode="decimal" defaultValue={t.amount} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={numericLock} />
       </label>
@@ -2832,7 +2864,7 @@ export default function App() {
         <span>Date</span>
         <input name="date" type="date" defaultValue={t.date} max={todayStr} required />
       </label>
-      <label className="field u-grow-full">
+      <label className="field grow-full">
         <span>Note</span>
         <input name="note" type="text" defaultValue={t.note} placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
       </label>
@@ -3027,7 +3059,7 @@ export default function App() {
     setIntroSaved(null);
     setIntroCurrency(data.settings.currency || '$');
     introRef.current?.showModal();
-    requestAnimationFrame(() => introRef.current?.querySelector('.btn--ink')?.focus());
+    requestAnimationFrame(() => introRef.current?.querySelector('.btn.ink')?.focus());
   }, [firstRun, data.settings.currency]);
 
   const skipIntro = () => {
@@ -3192,7 +3224,7 @@ export default function App() {
           : 0
     : 0;
   const stampDigitsClass =
-    formattedTodayAbs.length > 9 ? 'stamp--xl' : formattedTodayAbs.length > 6 ? 'stamp--lg' : '';
+    formattedTodayAbs.length > 9 ? 'digits-xl' : formattedTodayAbs.length > 6 ? 'digits-lg' : '';
 
   const togglePick = (cat) => {
     setPickedCat((p) => (p === cat ? null : cat));
@@ -3215,7 +3247,7 @@ export default function App() {
         ring = (
           <circle
             key="focus-ring"
-            className="donut__slice-focus"
+            className="slice-focus"
             cx="80"
             cy="80"
             r={ringR}
@@ -3230,7 +3262,7 @@ export default function App() {
       const el = (
         <circle
           key={cat}
-          className={`donut__slice ${focused ? 'is-active' : ''} ${pieFocus && !focused ? 'is-faded' : ''}`}
+          className={`slice ${focused ? 'on' : ''} ${pieFocus && !focused ? 'off' : ''}`}
           style={{ stroke: colorOf(cat) }}
           cx="80"
           cy="80"
@@ -3259,7 +3291,7 @@ export default function App() {
       const hit = (
         <circle
           key={`${cat}-hit`}
-          className="donut__slice-hit"
+          className="slice-hit"
           cx="80"
           cy="80"
           r={radius}
@@ -3303,11 +3335,11 @@ export default function App() {
   const fabTarget = ADD_FORMS[view];
 
   return (
-    <div className={`app app--${view}`}>
+    <div className={`app view-${view}`}>
       <header className={`topbar ${scrolled ? 'is-scrolled' : ''}`}>
         {isSettings ? (
           <a
-            className="icon-btn icon-btn--back"
+            className="icon-btn back-btn"
             href={`#/${lastMoneyViewRef.current}`}
             onClick={onBackClick}
             aria-label={`Back to ${MONEY_VIEWS.find((v) => v.id === lastMoneyViewRef.current)?.label || 'Today'}`}
@@ -3319,12 +3351,12 @@ export default function App() {
         ) : (
           <span className="brand">stdynt</span>
         )}
-        <span className={view === 'today' && hasDaily ? 'u-sr-only' : 'topbar__date'}>
+        <span className={view === 'today' && hasDaily ? 'sr-only' : 'topbar-date'}>
           {parseDate(todayStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
         </span>
         {!isSettings && (
           <a
-            className="icon-btn icon-btn--settings"
+            className="icon-btn settings-btn"
             href="#/settings"
             aria-label="Settings"
             aria-keyshortcuts=","
@@ -3339,10 +3371,10 @@ export default function App() {
         {fabTarget && fabTarget[0] === 'add-accounts' && (
           <>
             {fabOpen && (
-              <div className="fab__actions">
+              <div className="fab-actions">
                 <button
                   type="button"
-                  className="fab__action"
+                  className="fab-action"
                   onClick={() => {
                     setFabOpen(false);
                     openAddSheet('account');
@@ -3354,7 +3386,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  className="fab__action"
+                  className="fab-action"
                   onClick={() => {
                     setFabOpen(false);
                     openAddSheet('transfer');
@@ -3366,7 +3398,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  className="fab__action"
+                  className="fab-action"
                   onClick={() => {
                     setFabOpen(false);
                     openAddSheet('goal');
@@ -3379,7 +3411,7 @@ export default function App() {
               </div>
             )}
             <button
-              className="fab fab--compact"
+              className="fab compact"
               onClick={() => setFabOpen((o) => !o)}
               aria-label={fabOpen ? 'Close add menu' : fabTarget[1]}
               aria-expanded={fabOpen}
@@ -3390,19 +3422,19 @@ export default function App() {
               ) : (
                 <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
               )}
-              {!fabOpen && <kbd className="kbd-hint" aria-hidden="true">N</kbd>}
+              {!fabOpen && <kbd className="nav-kbd" aria-hidden="true">N</kbd>}
             </button>
           </>
         )}
         {fabTarget && fabTarget[0] !== 'add-accounts' && (
           <button
-            className="fab fab--compact"
+            className="fab compact"
             onClick={() => (view === 'today' ? openSheet() : openAddSheet())}
             aria-label={fabTarget[1]}
             aria-keyshortcuts="N"
           >
             <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
-            <kbd className="kbd-hint" aria-hidden="true">N</kbd>
+            <kbd className="nav-kbd" aria-hidden="true">N</kbd>
           </button>
         )}
         <nav className="bottom-nav" aria-label="Money">
@@ -3413,13 +3445,14 @@ export default function App() {
               onClick={(e) => onNavClick(e, id)}
               aria-current={view === id ? 'page' : undefined}
               aria-keyshortcuts={String(i + 1)}
+              aria-label={label}
             >
-              {view === id && <span className="bottom-nav__ink" aria-hidden="true" />}
-              <span className={`bottom-nav__icon bottom-nav__icon--${id}`}>
+              {view === id && <span className="nav-ink" aria-hidden="true" />}
+              <span className="nav-icon">
                 <Icon size={22} strokeWidth={2} aria-hidden="true" />
               </span>
-              <span className={`bottom-nav__label bottom-nav__label--${id}`}>{label}</span>
-              <kbd className="kbd-hint" aria-hidden="true">{i + 1}</kbd>
+              <span className="nav-label">{label}</span>
+              <kbd className="nav-kbd" aria-hidden="true">{i + 1}</kbd>
             </a>
           ))}
         </nav>
@@ -3427,20 +3460,20 @@ export default function App() {
 
       <main className="main">
         {storageCorrupted && (
-          <div className="slip is-over slip--storage" role="alert">
+          <div className="slip over storage-slip" role="alert">
             <TriangleAlert size={18} strokeWidth={2.25} aria-hidden="true" />
-            <div className="slip__body">
+            <div className="slip-body">
               <p>
                 Saved data couldn't be read, so changes aren't being saved. Restore a backup or erase and start over.
               </p>
-              <div className="slip__actions">
-                <label className="btn btn--outline">
+              <div className="slip-actions">
+                <label className="btn outline">
                   <Upload size={16} strokeWidth={2} aria-hidden="true" /> Restore backup
-                  <input type="file" accept=".json,application/json" onChange={importJSON} className="u-sr-only" />
+                  <input type="file" accept=".json,application/json" onChange={importJSON} className="sr-only" />
                 </label>
                 <button
                   type="button"
-                  className="btn btn--danger"
+                  className="btn danger"
                   onClick={() =>
                     startFresh(
                       {
@@ -3462,7 +3495,7 @@ export default function App() {
 
         <div className="live-slot" role="status">
           {!isSettings && view !== 'today' && isOverAlert && (
-            <div className={`slip ${monthState ? `is-${monthState}` : ''}`}>
+            <div className={`slip ${monthState}`}>
               <TriangleAlert size={18} strokeWidth={2.25} aria-hidden="true" />
               <span>
                 {monthState === 'over'
@@ -3473,20 +3506,20 @@ export default function App() {
           )}
         </div>
 
-        <div className={`pane pane--${view}`} key={view}>
+        <div className={`view-pane pane-${view}`} key={view}>
           {view === 'today' && (
             <>
-              <div className="today-layout">
-                <section className="card card--day" aria-labelledby="today-label">
+              <div className="today-col">
+                <section className="card day-card" aria-labelledby="today-label">
                   <div className="today">
-                    <div className={`well ${showWell && isNeg ? 'is-debt' : ''}`} style={{ '--level': wellLevel }}>
+                    <div className={`well ${showWell && isNeg ? 'debt' : ''}`} style={{ '--level': wellLevel }}>
                     {showWell && <LiquidWell level={Number(wellLevel)} />}
-                    <h1 id="today-label" className="today__label">
+                    <h1 id="today-label" className="today-label">
                       {!showWell ? 'Set your daily budget' : isNeg ? 'Over today by' : 'You can spend today'}
                     </h1>
 
                     {!showWell ? (
-                      <div className="budget-setup">
+                      <div className="budget-setup-box">
                         <p>
                           {!hasBudgetSet
                             ? 'Add your allowance to see what you can spend each day.'
@@ -3494,13 +3527,13 @@ export default function App() {
                               ? `${fmt(perDayLeft)} a day lasts until ${periodLastDay}.`
                               : 'Choose how much of your monthly budget to spend each day.'}
                         </p>
-                        <div className="budget-setup__actions">
+                        <div className="setup-actions">
                           {hasBudgetSet && perDayLeft > 0 && (
-                            <button type="button" className="btn btn--ink" onClick={() => applySuggestedDaily(null)}>
+                            <button type="button" className="btn ink" onClick={() => applySuggestedDaily(null)}>
                               Use {fmt(perDayLeft)} a day
                             </button>
                           )}
-                          <a className={`btn ${hasBudgetSet && perDayLeft > 0 ? 'btn--outline' : 'btn--ink'}`} href="#/settings">
+                          <a className={`btn ${hasBudgetSet && perDayLeft > 0 ? 'outline' : 'ink'}`} href="#/settings">
                             {hasBudgetSet && perDayLeft > 0 ? 'Choose my own' : 'Set up budget'}
                           </a>
                         </div>
@@ -3509,10 +3542,10 @@ export default function App() {
                       <>
                         <div
                           key={stampKey}
-                          className={`stamp ${isNeg ? 'is-debt' : ''} ${stampDigitsClass} ${stampKey ? 'is-pressed' : ''}`}
+                          className={`stamp ${isNeg ? 'debt' : ''} ${stampDigitsClass} ${stampKey ? 'pressed' : ''}`}
                         >
-                          <span className="u-sr-only">{fmt(Math.abs(wellAvailable))}</span>
-                          <span className="stamp__sym" aria-hidden="true">{sym}</span>
+                          <span className="sr-only">{fmt(Math.abs(wellAvailable))}</span>
+                          <span className="stamp-sym" aria-hidden="true">{sym}</span>
                           <StampFigure value={wellAvailable} sym={sym} />
                         </div>
                         <span className="date-stamp" aria-hidden="true">{stampDate(todayStr)}</span>
@@ -3521,21 +3554,21 @@ export default function App() {
                     </div>
                     {hasDaily ? (
                       <>
-                        <p className="u-sr-only">{summaryLabel}.</p>
-                        <dl className="math math--today" aria-hidden="true">
+                        <p className="sr-only">{summaryLabel}.</p>
+                        <dl className="math today-math" aria-hidden="true">
                           <div>
                             <dt>{weekendOff ? 'Weekend' : 'Daily'}</dt>
                             <dd><Money value={dailyToday} sym={sym} /></dd>
                           </div>
                           <div>
                             <dt>Carried</dt>
-                            <dd className={rolloverCarryover < 0 ? 'u-neg' : 'u-pos'}>
+                            <dd className={rolloverCarryover < 0 ? 'neg' : 'pos'}>
                               <Money value={rolloverCarryover} sym={sym} />
                             </dd>
                           </div>
                           <div>
                             <dt>Income</dt>
-                            <dd className={earnedToday > 0 ? 'u-pos' : ''}><Money value={earnedToday} sym={sym} /></dd>
+                            <dd className={earnedToday > 0 ? 'pos' : ''}><Money value={earnedToday} sym={sym} /></dd>
                           </div>
                           <div>
                             <dt>Spent</dt>
@@ -3545,8 +3578,8 @@ export default function App() {
                       </>
                     ) : showWell && (
                       <>
-                        <p className="u-sr-only">{summaryLabel}.</p>
-                        <dl className="math math--today math--single" aria-hidden="true">
+                        <p className="sr-only">{summaryLabel}.</p>
+                        <dl className="math today-math single" aria-hidden="true">
                           <div>
                             <dt>Income</dt>
                             <dd><Money value={incomeMonthly} sym={sym} /></dd>
@@ -3558,19 +3591,19 @@ export default function App() {
 
                   <div className="ledger">
                     {todaysEntries.map((exp) => (
-                      <div key={exp.id} className="ledger__row is-today" data-row={exp.id}>
+                      <div key={exp.id} className="ledger-row today-row" data-row={exp.id}>
                         <button
                           type="button"
-                          className="row-button"
+                          className="row-open"
                           onClick={() => openSheet(exp)}
                           aria-label={`Edit ${entryLabel(exp)}, ${entryAmount(exp)}`}
                         >
-                          <span className="ledger__date">{entryStamp(exp, todayStr)}</span>
-                          <span className="ledger__what">{entryLabel(exp)}</span>
-                          <span className={`ledger__amount ${exp.kind === 'income' ? 'u-pos' : ''}`}>{entryAmount(exp)}</span>
+                          <span className="d">{entryStamp(exp, todayStr)}</span>
+                          <span className="what">{entryLabel(exp)}</span>
+                          <span className={`n ${exp.kind === 'income' ? 'pos' : ''}`}>{entryAmount(exp)}</span>
                         </button>
                         <button
-                          className="row-delete"
+                          className="row-del"
                           onClick={() => deleteExpense(exp)}
                           aria-label={`Delete ${entryLabel(exp)}, ${entryAmount(exp)}`}
                         >
@@ -3581,14 +3614,14 @@ export default function App() {
                     {dayRows.length > 0 && (
                       <button
                         type="button"
-                        className={`ledger__head ledger__fold ${todaysEntries.length > 0 ? 'ledger__sub' : ''} ${earlierOpen ? 'is-open' : ''}`}
+                        className={`ledger-head ledger-fold ${todaysEntries.length > 0 ? 'ledger-sub' : ''} ${earlierOpen ? 'is-open' : ''}`}
                         aria-expanded={earlierOpen}
                         aria-controls="earlier-days"
                         aria-label="Earlier days"
                         onClick={() => setData((d) => ({ ...d, prefs: { ...d.prefs, earlierOpen: !earlierOpen } }))}
                       >
                         <span>Earlier</span>
-                        <span className="fold__chev">
+                        <span className="fold-chev">
                           <ChevronDown size={16} strokeWidth={2.25} aria-hidden="true" />
                         </span>
                         {earlierOpen && (
@@ -3601,29 +3634,29 @@ export default function App() {
                     )}
                     <div id="earlier-days" hidden={!earlierOpen}>
                     {earlierOpen && [...dayRows.filter((r) => !r.base).slice(0, 7), ...dayRows.filter((r) => r.base)].map((row) => (
-                      <div key={row.date} className={`ledger__row is-past ${row.base ? 'is-base' : ''}`}>
-                        <span className="ledger__date">{row.base ? 'BEFORE' : stampDate(row.date)}</span>
-                        <span className="ledger__what">{row.what}</span>
-                        <span className="ledger__amount">{row.base ? '' : fmt(row.spent)}</span>
-                        <span className={`mini-stamp ${row.carried < 0 ? 'is-debt' : ''}`}>
-                          <span className="u-sr-only">{row.carried < 0 ? 'Debt carried ' : 'Carried '}</span>
+                      <div key={row.date} className={`ledger-row past ${row.base ? 'base-row' : ''}`}>
+                        <span className="d">{row.base ? 'BEFORE' : stampDate(row.date)}</span>
+                        <span className="what">{row.what}</span>
+                        <span className="n">{row.base ? '' : fmt(row.spent)}</span>
+                        <span className={`mini-stamp ${row.carried < 0 ? 'debt' : ''}`}>
+                          <span className="sr-only">{row.carried < 0 ? 'Debt carried ' : 'Carried '}</span>
                           {signed(row.carried)}
                         </span>
                       </div>
                     ))}
                     </div>
                     {hasDaily && todaysEntries.length === 0 && dayRows.length === 0 && (
-                      <p className="ledger__empty">
+                      <p className="ledger-empty">
                         First day. Whatever you don't spend carries to tomorrow.
                       </p>
                     )}
                   </div>
-                  <div className={`month ${monthState ? `is-${monthState}` : ''}`}>
-                    <div className="month__line">
-                      <span className="month__name">
+                  <div className={`month ${monthState}`}>
+                    <div className="month-line">
+                      <span className="month-name">
                         {periodName}{monthlyBudget > 0 ? ' budget' : ' spending'}
                       </span>
-                      <span className="month__pct">
+                      <span className="month-pct">
                         {monthlyBudget > 0 ? (
                           <><b>{percentMonthlyUsed.toFixed(0)}%</b> used</>
                         ) : (
@@ -3632,22 +3665,22 @@ export default function App() {
                       </span>
                     </div>
                     {monthlyBudget > 0 && (
-                      <div className="month__bar" aria-hidden="true">
-                        <i style={{ width: `${Math.min(100, Math.max(0, percentMonthlyUsed))}%` }} />
+                      <div className="month-bar" aria-hidden="true">
+                        <i style={{ '--pct': Math.min(100, Math.max(0, percentMonthlyUsed)) / 100 }} />
                         <b style={{ left: `${alertThresh}%` }} />
                       </div>
                     )}
                     {monthlyBudget > 0 && (
-                      <p className="month__sub">
-                        <span className="month__figure">
-                          <span className="u-num">{fmt(totalMonthlyCommitted)}</span> of{' '}
-                          <span className="u-num">{fmt(monthAvailable)}</span>
+                      <p className="month-sub">
+                        <span className="month-figure">
+                          <span className="num">{fmt(totalMonthlyCommitted)}</span> of{' '}
+                          <span className="num">{fmt(monthAvailable)}</span>
                         </span>
-                        <span className="month__figure">
-                          <span className="u-num">{fmt(Math.abs(remainingMonthly))}</span> {remainingMonthly < 0 ? 'over' : 'left'}
+                        <span className="month-figure">
+                          <span className="num">{fmt(Math.abs(remainingMonthly))}</span> {remainingMonthly < 0 ? 'over' : 'left'}
                         </span>
                         {remainingMonthly >= 0 && perDayLeft > 0 && daysLeftInPeriod > 1 && (
-                          <span className="month__figure"><span className="u-num">{fmt(perDayLeft)}</span> a day</span>
+                          <span className="month-figure"><span className="num">{fmt(perDayLeft)}</span> a day</span>
                         )}
                       </p>
                     )}
@@ -3660,13 +3693,13 @@ export default function App() {
                   <h2>History</h2>
                 </div>
                 {historyAll.length === 0 ? (
-                  <p className="empty-state">Nothing logged yet.</p>
+                  <p className="empty">Nothing logged yet.</p>
                 ) : (
                   <>
-                    <div className="history__tools" role="search">
-                      <label className="history__field hsearch">
-                        <span className="u-sr-only">Search</span>
-                        <span className="history__search-box">
+                    <div className="history-tools" role="search">
+                      <label className="hfield hsearch">
+                        <span className="sr-only">Search</span>
+                        <span className="hsearch-box">
                           <Search size={16} strokeWidth={2.25} aria-hidden="true" />
                           <input
                             type="search"
@@ -3680,7 +3713,7 @@ export default function App() {
                       </label>
                       <button
                         type="button"
-                        className={`history__filters-btn ${historyToolsOpen ? 'is-open' : ''}`}
+                        className={`filters-btn ${historyToolsOpen ? 'is-open' : ''}`}
                         aria-expanded={historyToolsOpen}
                         aria-controls="history-filters"
                         aria-label={historyToolsOn ? 'Show and sort, changed' : 'Show and sort'}
@@ -3688,11 +3721,11 @@ export default function App() {
                         onClick={() => setPref('historyToolsOpen', !historyToolsOpen)}
                       >
                         <SlidersHorizontal size={20} strokeWidth={2} aria-hidden="true" />
-                        {historyToolsOn && <i className="history__filters-dot" aria-hidden="true" />}
+                        {historyToolsOn && <i className="filters-dot" aria-hidden="true" />}
                       </button>
                     </div>
-                    <div id="history-filters" className={`history__filters ${historyToolsOpen ? 'is-open' : ''}`}>
-                      <label className="history__field">
+                    <div id="history-filters" className={`history-filters ${historyToolsOpen ? 'is-open' : ''}`}>
+                      <label className="hfield">
                         <span>Show</span>
                         <select value={historyCat} onChange={(e) => setHistoryFilter(historyQuery, e.target.value)}>
                           <option value="">Everything</option>
@@ -3705,7 +3738,7 @@ export default function App() {
                         </select>
                       </label>
                       <fieldset className="sort-seg">
-                        <legend className="u-sr-only">Sort history</legend>
+                        <legend className="sr-only">Sort history</legend>
                         {[
                           ['date', 'By date'],
                           ['added', 'Recently added']
@@ -3724,7 +3757,7 @@ export default function App() {
                       </fieldset>
                     </div>
                     {historyFiltered && (
-                      <p className="history__filter-count" role="status">
+                      <p className="filter-count" role="status">
                         {historyEntries.length === 0
                           ? 'No matches.'
                           : `${historyEntries.length} ${historyEntries.length === 1 ? 'match' : 'matches'}.`}{' '}
@@ -3740,30 +3773,30 @@ export default function App() {
                           const n = day.entries.length;
                           const panelId = `history-day-${i}`;
                           return (
-                            <li key={`${day.date}:${i}`} className={`history__day ${open ? 'is-open' : ''}`}>
+                            <li key={`${day.date}:${i}`} className="history-day">
                               <button
                                 type="button"
-                                className="history__day-head"
+                                className="day-head"
                                 aria-expanded={open}
                                 aria-controls={panelId}
                                 onClick={() => toggleDay(day.date)}
                               >
-                                <span className="history__day-name">{historyDayLabel(day.date, todayStr)}</span>
-                                <span className="u-sr-only">
+                                <span className="day-name">{historyDayLabel(day.date, todayStr)}</span>
+                                <span className="sr-only">
                                   , {n} {n === 1 ? 'entry' : 'entries'}
                                 </span>
                                 <MoneyFit
                                   sym={sym}
-                                  className="u-num history__day-total"
+                                  className="num day-total"
                                   parts={[
                                     ...(day.spent > 0 ? [{ value: day.spent }] : []),
-                                    ...(day.earned > 0 ? [{ value: day.earned, sign: '+', className: 'history__day-in' }] : [])
+                                    ...(day.earned > 0 ? [{ value: day.earned, sign: '+', className: 'day-in' }] : [])
                                   ]}
                                 />
-                                <ChevronDown className="history__day-chev" size={18} strokeWidth={2.25} aria-hidden="true" />
+                                <ChevronDown className="day-chev" size={18} strokeWidth={2.25} aria-hidden="true" />
                               </button>
                               {open && (
-                                <ul className="history__day-rows" id={panelId}>
+                                <ul className="day-rows" id={panelId}>
                                   {day.entries.map((exp) => renderHistoryRow(exp, true))}
                                 </ul>
                               )}
@@ -3802,10 +3835,10 @@ export default function App() {
           )}
 
           {view === 'categories' && (
-            <section className="card card--pad card--cats">
-              <div className="card__title-row">
+            <section className="card pad cat-card">
+              <div className="card-title-row">
                 <h1>Where it went</h1>
-                <span className="u-num u-muted">{fmt(pieTotal)}</span>
+                <span className="num muted">{fmt(pieTotal)}</span>
               </div>
               <div className="period-nav">
                 <button
@@ -3831,52 +3864,52 @@ export default function App() {
                 </button>
               </div>
               {periodOffset === 0 && subsPending > 0 && (
-                <p className="card__note">
-                  Plus <span className="u-num">{fmt(subsPending)}</span> in subscriptions, counted in the month total.
+                <p className="card-note">
+                  Plus <span className="num">{fmt(subsPending)}</span> in subscriptions, counted in the month total.
                 </p>
               )}
               {pieTotal <= 0 ? (
-                <p className="card__empty">
+                <p className="card-empty">
                   No expenses in {viewPeriodName}
                   {periodOffset === 0 ? ' yet' : ''}.
                 </p>
               ) : (
                 <div className="cat-layout">
-                  <div className="donut__wrap">
+                  <div className="donut-wrap">
                     <svg viewBox="0 0 160 160" className="donut" role="group" aria-label="Spending by category">
                       {renderDonut()}
-                      <g className="donut__center" key={pieShown} aria-hidden="true">
-                        <text x="80" y="68" textAnchor="middle" className="donut__key">
+                      <g className="donut-center" key={pieShown} aria-hidden="true">
+                        <text x="80" y="68" textAnchor="middle" className="donut-k">
                           {pieShown.length > 14 ? `${pieShown.slice(0, 12)}…` : pieShown}
                         </text>
-                        <text x="80" y="92" textAnchor="middle" className="donut__value">
+                        <text x="80" y="92" textAnchor="middle" className="donut-v">
                           {((pieShownAmt / pieTotal) * 100).toFixed(0)}%
                         </text>
-                        <text x="80" y="108" textAnchor="middle" className="donut__note">
+                        <text x="80" y="108" textAnchor="middle" className="donut-a">
                           {fmt(pieShownAmt)}
                         </text>
                       </g>
                     </svg>
-                    <p className="donut__hint">
+                    <p className="donut-hint">
                       {pickedCat && pieHas(pickedCat) ? 'Tap again to clear' : data.prefs.sliceTapped ? '' : 'Tap a slice for details'}
                     </p>
                   </div>
                   <div className="cat-side">
                     <ul className="legend">
                       {pieEntries.map(([cat, amt]) => (
-                        <li key={cat} className={pieFocus && pieFocus !== cat ? 'is-dim' : ''}>
+                        <li key={cat} className={pieFocus && pieFocus !== cat ? 'dim' : ''}>
                           <button
                             type="button"
-                            className="legend__btn"
+                            className="legend-btn"
                             aria-pressed={pickedCat === cat}
                             onClick={() => togglePick(cat)}
                             onPointerEnter={(e) => e.pointerType === 'mouse' && setHoverCat(cat)}
                             onPointerLeave={() => setHoverCat(null)}
                           >
                             <span className="cat-dot" style={{ background: colorOf(cat) }} />
-                            <span className="legend__name">{cat}</span>
-                            <span className="u-num">{fmt(amt)}</span>
-                            <span className="u-num legend__pct">{((amt / pieTotal) * 100).toFixed(0)}%</span>
+                            <span className="legend-name">{cat}</span>
+                            <span className="num">{fmt(amt)}</span>
+                            <span className="num legend-pct">{((amt / pieTotal) * 100).toFixed(0)}%</span>
                           </button>
                         </li>
                       ))}
@@ -3884,23 +3917,23 @@ export default function App() {
                     {pickedExpenses.length > 0 && (
                       <div className="picked" key={pickedCat}>
                         <h2>
-                          {pickedCat} <span className="u-num u-muted">· {pickedExpenses.length}</span>
+                          {pickedCat} <span className="num muted">· {pickedExpenses.length}</span>
                         </h2>
-                        <ul className="card__list">
+                        <ul className="card-list">
                           {pickedExpenses.slice(0, 8).map((exp) => (
                             <li key={exp.id}>
-                              <button type="button" className="row-button" onClick={() => openSheet(exp)}>
-                                <span className="u-grow">
+                              <button type="button" className="row-open" onClick={() => openSheet(exp)}>
+                                <span className="grow">
                                   {exp.note || exp.category}
-                                  <small className="u-muted">{entryStamp(exp, todayStr)}</small>
+                                  <small className="muted">{entryStamp(exp, todayStr)}</small>
                                 </span>
-                                <span className="u-num">{fmt(exp.amount)}</span>
+                                <span className="num">{fmt(exp.amount)}</span>
                               </button>
                             </li>
                           ))}
                         </ul>
                         {pickedExpenses.length > 8 && (
-                          <p className="card__note">+{pickedExpenses.length - 8} more</p>
+                          <p className="card-note">+{pickedExpenses.length - 8} more</p>
                         )}
                       </div>
                     )}
@@ -3910,7 +3943,7 @@ export default function App() {
               {data.expenses.length > 0 && (
                 <div className="trend">
                   <h2>Last {TREND_PERIODS} months</h2>
-                  <ol className="trend__bars">
+                  <ol className="trend-bars">
                     {trend.map((t, i) => {
                       const offset = i - (trend.length - 1);
                       const chosen = offset === periodOffset;
@@ -3919,24 +3952,24 @@ export default function App() {
                         <li key={t.start}>
                           <button
                             type="button"
-                            className={`trend__bar ${chosen ? 'is-active' : ''}`}
+                            className={`trend-bar ${chosen ? 'on' : ''}`}
                             aria-pressed={chosen}
                             aria-label={`${periodLabel(t)}: ${fmt(t.total)}`}
                             onClick={() => goToPeriod(offset)}
                           >
-                            <span className="trend__track">
-                              <span className="trend__amount u-num" aria-hidden="true">
+                            <span className="trend-track">
+                              <span className="trend-amt num" aria-hidden="true">
                                 {t.total > 0 ? compactAmount(t.total) : ''}
                               </span>
-                              <span className="trend__fill" style={{ height: `${t.total > 0 ? Math.max(share, 3) : 0}%` }} />
+                              <span className="trend-fill" style={{ '--i': i, height: `${t.total > 0 ? Math.max(share, 3) : 0}%` }} />
                               {monthlyBudget > 0 && (
                                 <span
-                                  className="trend__goal"
+                                  className="trend-goal"
                                   style={{ bottom: `${(monthlyBudget / trendMax) * TREND_FILL_SHARE}%` }}
                                 />
                               )}
                             </span>
-                            <span className="trend__month">
+                            <span className="trend-month">
                               {parseDate(t.start).toLocaleDateString('en-GB', { month: 'short' })}
                             </span>
                           </button>
@@ -3944,24 +3977,24 @@ export default function App() {
                       );
                     })}
                   </ol>
-                  {monthlyBudget > 0 && <p className="card__note">The dashed line is your monthly budget.</p>}
+                  {monthlyBudget > 0 && <p className="card-note">The dashed line is your monthly budget.</p>}
                 </div>
               )}
             </section>
           )}
 
           {view === 'subs' && (
-            <section className="card card--pad">
-              <div className="card__title-row">
+            <section className="card pad">
+              <div className="card-title-row">
                 <h1>Subscriptions</h1>
                 {data.subscriptions.length === 0 ? (
-                  <p className="card__empty">No subscriptions yet.</p>
+                  <p className="card-empty">No subscriptions yet.</p>
                 ) : (
-                  <span className="u-num u-muted">{fmt(subsMonthly)} / month</span>
+                  <span className="num muted">{fmt(subsMonthly)} / month</span>
                 )}
               </div>
               {data.subscriptions.length > 0 && (
-                <ul className="card__list">
+                <ul className="card-list">
                   {data.subscriptions.map((sub) => {
                     const editingThis = rowEdit?.list === 'subscriptions' && rowEdit.id === sub.id;
                     const meta = [
@@ -3975,25 +4008,25 @@ export default function App() {
                       .filter(Boolean)
                       .join(' · ');
                     return (
-                      <li key={sub.id} data-row={sub.id} className={editingThis ? 'is-editing' : ''}>
+                      <li key={sub.id} data-row={sub.id}>
                         {editingThis ? (
                           <form className="row-edit" onSubmit={(e) => saveSub(e, sub)}>
-                            <label className="field u-grow">
+                            <label className="field grow">
                               <span>Service</span>
                               <input name="name" type="text" defaultValue={sub.name} maxLength={NAME_MAX} required onInput={textLock} />
                             </label>
-                            <label className="field field--amount">
+                            <label className="field amount">
                               <span>Per month</span>
                               <input name="cost" type="text" inputMode="decimal" defaultValue={sub.cost} autoComplete="off" required onInput={numericLock} />
                             </label>
-                            <label className="field field--day">
+                            <label className="field day">
                               <span>Billing day</span>
                               <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" defaultValue={sub.billingDay || ''} placeholder="None" onInput={clearValidity} />
                             </label>
                             {accountField(accountOf(sub.accountId)?.id, 'Paid from')}
                             <div className="row-edit-actions">
-                              <button type="submit" className="btn btn--ink">Save</button>
-                              <button type="button" className="btn btn--outline" onClick={() => setRowEdit(null)}>
+                              <button type="submit" className="btn ink">Save</button>
+                              <button type="button" className="btn outline" onClick={() => setRowEdit(null)}>
                                 Cancel
                               </button>
                             </div>
@@ -4002,18 +4035,18 @@ export default function App() {
                           <>
                             <button
                               type="button"
-                              className="row-button"
+                              className="row-open"
                               onClick={() => setRowEdit({ list: 'subscriptions', id: sub.id })}
                               aria-label={`Edit ${sub.name}, ${fmt(sub.cost)} a month`}
                             >
-                              <span className="u-grow">
+                              <span className="grow">
                                 {sub.name}
-                                {meta && <small className="u-muted">{meta}</small>}
+                                {meta && <small className="muted">{meta}</small>}
                               </span>
-                              <span className="u-num">{fmt(sub.cost)}</span>
+                              <span className="num">{fmt(sub.cost)}</span>
                             </button>
                             <button
-                              className="row-delete"
+                              className="row-del"
                               onClick={() => removeWithUndo('subscriptions', sub, `Removed ${sub.name}.`)}
                               aria-label={`Remove ${sub.name}`}
                             >
@@ -4030,26 +4063,26 @@ export default function App() {
           )}
 
           {view === 'loans' && (
-            <section className="card card--pad">
-              <div className="card__title-row">
+            <section className="card pad">
+              <div className="card-title-row">
                 <h1>Loans</h1>
-                {data.debts.length === 0 && <p className="card__empty">No loans yet.</p>}
+                {data.debts.length === 0 && <p className="card-empty">No loans yet.</p>}
               </div>
               {data.debts.length > 0 && (
-                <dl className="math math--loans">
+                <dl className="math loans-math">
                   <div>
                     <dt>You owe</dt>
-                    <dd className={owedTotal > 0 ? 'u-neg' : ''}><Money value={owedTotal} sym={sym} /></dd>
+                    <dd className={owedTotal > 0 ? 'neg' : ''}><Money value={owedTotal} sym={sym} /></dd>
                   </div>
                   <div>
                     <dt>Owed to you</dt>
-                    <dd className="u-pos"><Money value={owedToMeTotal} sym={sym} /></dd>
+                    <dd className="pos"><Money value={owedToMeTotal} sym={sym} /></dd>
                   </div>
                 </dl>
               )}
               {data.debts.length > 1 && (
-                <fieldset className="radio-seg radio-seg--filter">
-                  <legend className="u-sr-only">Show loans</legend>
+                <fieldset className="radio-seg loan-filter">
+                  <legend className="sr-only">Show loans</legend>
                   {[
                     ['all', 'All'],
                     ['active', 'Active'],
@@ -4057,16 +4090,10 @@ export default function App() {
                     ['paid', 'Paid']
                   ].map(([value, label]) => (
                     <label key={value}>
-                      <input
-                        type="radio"
-                        name="loanFilter"
-                        value={value}
-                        checked={loanFilter === value}
-                        onChange={() => runRowTransition(() => setLoanFilter(value))}
-                      />
+                      <input type="radio" name="loanFilter" value={value} checked={loanFilter === value} onChange={() => runRowTransition(() => setLoanFilter(value))} />
                       <span>
                         {label}
-                        {value !== 'all' && loanCounts[value] > 0 && <small className="u-num">{loanCounts[value]}</small>}
+                        {value !== 'all' && loanCounts[value] > 0 && <small className="num">{loanCounts[value]}</small>}
                       </span>
                     </label>
                   ))}
@@ -4075,9 +4102,9 @@ export default function App() {
               {data.debts.length === 0 ? (
                 null
               ) : shownLoans.length === 0 ? (
-                <p className="card__empty">No {loanFilter} loans.</p>
+                <p className="card-empty">No {loanFilter} loans.</p>
               ) : (
-                <ul className="card__list">
+                <ul className="card-list">
                   {shownLoans.map(({ debt, sum }) => {
                     const editingThis = rowEdit?.list === 'debts' && rowEdit.id === debt.id;
                     const left = sum.remaining;
@@ -4106,10 +4133,10 @@ export default function App() {
                             .filter(Boolean)
                             .join(' · ');
                     return (
-                      <li key={debt.id} data-row={debt.id} className={`loan-row ${editingThis ? 'is-editing' : ''} ${paidUp ? 'is-paid' : ''}`}>
+                      <li key={debt.id} data-row={debt.id} className={`loan-row ${paidUp ? 'is-paid' : ''}`}>
                         <button
                           type="button"
-                          className="row-button"
+                          className="row-open"
                           aria-expanded={editingThis}
                           aria-controls={panelId}
                           onClick={() => {
@@ -4117,17 +4144,17 @@ export default function App() {
                             setRowEdit(editingThis ? null : { list: 'debts', id: debt.id });
                           }}
                         >
-                          <span className="u-grow">
+                          <span className="grow">
                             {debt.person}
-                            <small className={iOwe ? 'u-neg' : 'u-pos'}>
+                            <small className={iOwe ? 'neg' : 'pos'}>
                               {[iOwe ? 'You owe' : 'Owed to you', debt.date && dueLabel(debt.date), accountLabel(debt.accountId), debt.note]
                                 .filter(Boolean)
                                 .join(' · ')}
                             </small>
                           </span>
-                          <span className="u-num amount-stack">
+                          <span className="num loan-amt">
                             {fmt(left)}
-                            <small className="u-muted">{paidUp ? 'left' : `of ${fmt(debt.amount)}`}</small>
+                            <small className="muted">{paidUp ? 'left' : `of ${fmt(debt.amount)}`}</small>
                           </span>
                         </button>
                         {!paidUp &&
@@ -4160,10 +4187,10 @@ export default function App() {
                             aria-valuemax={100}
                             aria-valuenow={Math.round(sum.progress * 100)}
                           >
-                            <i style={{ width: `${sum.progress * 100}%` }} />
+                            <i style={{ '--pct': sum.progress }} />
                           </div>
-                          <p className="loan-plan u-muted">
-                            {sum.status === 'overdue' && <b className="loan-badge loan-badge--overdue">{sum.overdue} overdue</b>}
+                          <p className="loan-plan muted">
+                            {sum.status === 'overdue' && <b className="loan-badge overdue">{sum.overdue} overdue</b>}
                             {paidUp && <b className="loan-badge">Paid</b>}
                             <span>
                               {[
@@ -4179,24 +4206,24 @@ export default function App() {
                         {editingThis && (
                           <div className="loan-panel" id={panelId}>
                             {!paidUp && (
-                              <form key={`${left}-${rowEdit.pay ? 'pay' : 'open'}`} className="row-edit row-edit--pay" onSubmit={(e) => recordPayment(e, debt)}>
-                                <label className="field u-grow">
+                              <form key={`${left}-${rowEdit.pay ? 'pay' : 'open'}`} className="row-edit pay-form" onSubmit={(e) => recordPayment(e, debt)}>
+                                <label className="field grow">
                                   <span>{iOwe ? (plan ? 'You paid' : 'You paid back') : `${debt.person} paid back`}</span>
                                   <input name="paid" type="text" inputMode="decimal" defaultValue={plan ? sum.nextAmount : undefined} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required autoFocus={!!rowEdit.pay} onInput={numericLock} />
                                 </label>
-                                <label className="field field--date">
+                                <label className="field date">
                                   <span>On</span>
                                   <input name="date" type="date" defaultValue={todayStr} max={todayStr} />
                                 </label>
-                                <label className="field u-grow">
+                                <label className="field grow">
                                   <span>Note</span>
                                   <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
                                 </label>
                                 {accountField(accountOf(debt.accountId)?.id, iOwe ? 'Paid from' : 'Paid into')}
                                 <div className="row-edit-actions">
-                                  <button type="submit" className="btn btn--ink">Record payment</button>
+                                  <button type="submit" className="btn ink">Record payment</button>
                                   {plan && (
-                                    <button type="button" className="btn btn--outline" onClick={() => settleDebt(debt, left, `Paid off ${debt.person}, ${fmt(left)}.`)}>
+                                    <button type="button" className="btn outline" onClick={() => settleDebt(debt, left, `Paid off ${debt.person}, ${fmt(left)}.`)}>
                                       Pay off {fmt(left)}
                                     </button>
                                   )}
@@ -4205,18 +4232,18 @@ export default function App() {
                             )}
                             {sum.schedule.length > 0 && (
                               <>
-                                <h2 className="panel-subhead">Schedule</h2>
+                                <h2 className="loan-sub">Schedule</h2>
                                 <ul className="pay-list" aria-label="Installment schedule">
                                   {schedRows.map((r) => (
                                     <li key={r.n} className={r.status === 'paid' ? 'is-done' : r.due && r.due < todayStr ? 'is-late' : ''}>
                                       <span>{r.due ? dueLabel(r.due) : `No. ${r.n}`}</span>
                                       <span className="pay-note">{rowNote(r)}</span>
-                                      <span className="u-num">{fmt(r.amount)}</span>
+                                      <span className="num">{fmt(r.amount)}</span>
                                     </li>
                                   ))}
                                 </ul>
                                 {sum.schedule.length > 4 && (
-                                  <button type="button" className="text-btn text-btn--more" onClick={() => toggleMore(`${debt.id}:sched`)}>
+                                  <button type="button" className="text-btn more-link" onClick={() => toggleMore(`${debt.id}:sched`)}>
                                     {schedAll ? 'Show fewer' : `Show all ${sum.schedule.length}`}
                                   </button>
                                 )}
@@ -4224,30 +4251,30 @@ export default function App() {
                             )}
                             {payments.length > 0 && (
                               <>
-                                <h2 className="panel-subhead">Payments</h2>
+                                <h2 className="loan-sub">Payments</h2>
                                 <ul className="pay-list" aria-label="Payments so far">
                                   {payRows.map((p) =>
                                     payEdit === p.id ? (
-                                      <li key={p.id} className="is-editing">
-                                        <form className="row-edit row-edit--pay" onSubmit={(e) => savePayment(e, debt, p)}>
-                                          <label className="field u-grow">
+                                      <li key={p.id}>
+                                        <form className="row-edit pay-form" onSubmit={(e) => savePayment(e, debt, p)}>
+                                          <label className="field grow">
                                             <span>Paid</span>
                                             <input name="paid" type="text" inputMode="decimal" defaultValue={p.amount} autoComplete="off" required autoFocus onInput={numericLock} />
                                           </label>
-                                          <label className="field field--date">
+                                          <label className="field date">
                                             <span>On</span>
                                             <input name="date" type="date" defaultValue={p.date || todayStr} max={todayStr} />
                                           </label>
-                                          <label className="field u-grow">
+                                          <label className="field grow">
                                             <span>Note</span>
                                             <input name="note" type="text" defaultValue={p.note || ''} placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
                                           </label>
                                           <div className="row-edit-actions">
-                                            <button type="submit" className="btn btn--outline">Save</button>
-                                            <button type="button" className="btn btn--danger" onClick={() => removePayment(debt, p)}>
+                                            <button type="submit" className="btn outline">Save</button>
+                                            <button type="button" className="btn danger" onClick={() => removePayment(debt, p)}>
                                               Remove
                                             </button>
-                                            <button type="button" className="btn btn--outline" onClick={() => setPayEdit(null)}>
+                                            <button type="button" className="btn outline" onClick={() => setPayEdit(null)}>
                                               Cancel
                                             </button>
                                           </div>
@@ -4257,7 +4284,7 @@ export default function App() {
                                       <li key={p.id}>
                                         <span>{p.date ? dueLabel(p.date) : 'Paid'}</span>
                                         <span className="pay-note">{[p.note, accountOf(p.accountId)?.name].filter(Boolean).join(' · ')}</span>
-                                        <span className="u-num">{fmt(p.amount)}</span>
+                                        <span className="num">{fmt(p.amount)}</span>
                                         <button type="button" className="pay-act" onClick={() => setPayEdit(p.id)} aria-label={`Edit the ${fmt(p.amount)} payment`}>
                                           Edit
                                         </button>
@@ -4266,7 +4293,7 @@ export default function App() {
                                   )}
                                 </ul>
                                 {payments.length > 3 && (
-                                  <button type="button" className="text-btn text-btn--more" onClick={() => toggleMore(`${debt.id}:pay`)}>
+                                  <button type="button" className="text-btn more-link" onClick={() => toggleMore(`${debt.id}:pay`)}>
                                     {payAll ? 'Show fewer' : `Show all ${payments.length}`}
                                   </button>
                                 )}
@@ -4275,39 +4302,39 @@ export default function App() {
                             <Fold
                               id={`loan-edit-${debt.id}`}
                               label="Edit loan details"
-                              className="fold--loan"
+                              className="loan-fold"
                               open={editOpen}
                               onToggle={() => toggleMore(`${debt.id}:edit`)}
                             />
-                            <div className="fold__body" id={`loan-edit-${debt.id}`} hidden={!editOpen}>
+                            <div className="fold-body" id={`loan-edit-${debt.id}`} hidden={!editOpen}>
                             <form className="row-edit" onSubmit={(e) => saveDebt(e, debt)}>
-                              <label className="field u-grow">
+                              <label className="field grow">
                                 <span>{iOwe ? 'Who or what' : 'Who'}</span>
                                 <input name="person" type="text" defaultValue={debt.person} maxLength={NAME_MAX} required onInput={textLock} />
                               </label>
-                              <label className="field field--amount">
+                              <label className="field amount">
                                 <span>Total</span>
                                 <input name="amount" type="text" inputMode="decimal" defaultValue={debt.amount} autoComplete="off" required onInput={numericLock} />
                               </label>
-                              <label className="field u-grow">
+                              <label className="field grow">
                                 <span>What for</span>
                                 <input name="note" type="text" defaultValue={debt.note || ''} placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
                               </label>
-                              <label className="field field--date">
+                              <label className="field date">
                                 <span>Since</span>
                                 <input name="date" type="date" defaultValue={debt.date || ''} max={todayStr} />
                               </label>
                               <PlanFields plan={plan} todayStr={todayStr} optional />
                               <div className="row-edit-actions">
-                                <button type="submit" className="btn btn--outline">Save</button>
-                                <button type="button" className="btn btn--danger" onClick={() => removeLoan(debt)}>
+                                <button type="submit" className="btn outline">Save</button>
+                                <button type="button" className="btn danger" onClick={() => removeLoan(debt)}>
                                   Delete loan
                                 </button>
                               </div>
                             </form>
                             </div>
-                            <div className="row-edit-actions row-edit-actions--compact">
-                              <button type="button" className="btn btn--outline" onClick={() => setRowEdit(null)}>
+                            <div className="row-edit-actions loan-close">
+                              <button type="button" className="btn outline" onClick={() => setRowEdit(null)}>
                                 Close
                               </button>
                             </div>
@@ -4322,43 +4349,43 @@ export default function App() {
           )}
 
           {view === 'accounts' && (
-            <section className="card card--pad">
-              <div className="card__title-row">
+            <section className="card pad">
+              <div className="card-title-row">
                 <h1>Accounts</h1>
-                {!hasAccounts && <p className="card__empty">No accounts yet.</p>}
+                {!hasAccounts && <p className="card-empty">No accounts yet.</p>}
               </div>
               {accounts.length > 1 && (
-<dl className="math math--accounts">
+<dl className="math accounts-math">
                 <div>
                   <dt>Total balance</dt>
-                  <dd className={sumBalances() < 0 ? 'u-neg' : 'u-pos'}><Money value={sumBalances()} sym={sym} /></dd>
+                  <dd className={sumBalances() < 0 ? 'neg' : 'pos'}><Money value={sumBalances()} sym={sym} /></dd>
                 </div>
 {accountSplit && (
 <>
                 <div>
                   <dt>Bank</dt>
-                  <dd className={sumBalances('bank') < 0 ? 'u-neg' : ''}><Money value={sumBalances('bank')} sym={sym} /></dd>
+                  <dd className={sumBalances('bank') < 0 ? 'neg' : ''}><Money value={sumBalances('bank')} sym={sym} /></dd>
                 </div>
                 <div>
                   <dt>E-wallet</dt>
-                  <dd className={sumBalances('ewallet') < 0 ? 'u-neg' : ''}><Money value={sumBalances('ewallet')} sym={sym} /></dd>
+                  <dd className={sumBalances('ewallet') < 0 ? 'neg' : ''}><Money value={sumBalances('ewallet')} sym={sym} /></dd>
                 </div>
 </>
 )}
               </dl>
 )}
               {hasAccounts && (
-                <ul className="card__list">
+                <ul className="card-list">
                   {accounts.map((acc) => {
                     const editingThis = rowEdit?.list === 'accounts' && rowEdit.id === acc.id;
                     const live = balanceOf(acc);
                     const editPresets = ACCOUNT_PRESETS[editAccountType] || ACCOUNT_PRESETS.bank;
                     return (
-                      <li key={acc.id} data-row={acc.id} className={editingThis ? 'is-editing' : ''}>
+                      <li key={acc.id} data-row={acc.id}>
                         {editingThis ? (
                           <form className="row-edit" onSubmit={(e) => saveAccount(e, acc)}>
-                            <fieldset className="radio-seg u-grow-full">
-                              <legend className="u-sr-only">Kind of account</legend>
+                            <fieldset className="radio-seg grow-full">
+                              <legend className="sr-only">Kind of account</legend>
                               {ACCOUNT_TYPES.map(([value, label]) => (
                                 <label key={value}>
                                   <input
@@ -4375,7 +4402,7 @@ export default function App() {
                                 </label>
                               ))}
                             </fieldset>
-                            <label className="field u-grow">
+                            <label className="field grow">
                               <span>{accountTypeLabel(editAccountType)}</span>
                               <select
                                 name="preset"
@@ -4394,7 +4421,7 @@ export default function App() {
                               </select>
                             </label>
                             {editAccountPreset === CUSTOM_PRESET && (
-                              <label className="field u-grow">
+                              <label className="field grow">
                                 <span>Custom name</span>
                                 <input
                                   name="name"
@@ -4408,7 +4435,7 @@ export default function App() {
                                 />
                               </label>
                             )}
-                            <label className="field field--balance">
+                            <label className="field balance">
                               <span>Balance now</span>
                               <input
                                 name="balance"
@@ -4421,13 +4448,13 @@ export default function App() {
                                 onInput={numericLock}
                               />
                             </label>
-                            <p id={`acc-hint-${acc.id}`} className="u-hint u-grow-full">
+                            <p id={`acc-hint-${acc.id}`} className="hint grow-full">
                               Started at {fmt(acc.balance)}. Correcting the balance moves that starting figure, and your
                               entries stay as they are.
                             </p>
                             <div className="row-edit-actions">
-                              <button type="submit" className="btn btn--ink">Save</button>
-                              <button type="button" className="btn btn--outline" onClick={() => setRowEdit(null)}>
+                              <button type="submit" className="btn ink">Save</button>
+                              <button type="button" className="btn outline" onClick={() => setRowEdit(null)}>
                                 Cancel
                               </button>
                             </div>
@@ -4436,17 +4463,17 @@ export default function App() {
                           <>
                             <button
                               type="button"
-                              className="row-button"
+                              className="row-open"
                               onClick={() => startEditAccount(acc)}
                               aria-label={`Edit ${acc.name}, ${accountTypeLabel(acc.type)}, balance ${fmt(live)}`}
                             >
-                              <span className="u-grow">
+                              <span className="grow">
                                 {acc.name}
-                                <small className="u-muted">{accountTypeLabel(acc.type)}</small>
+                                <small className="muted">{accountTypeLabel(acc.type)}</small>
                               </span>
-                              <span className={`u-num ${live < 0 ? 'u-neg' : ''}`}>{fmt(live)}</span>
+                              <span className={`num ${live < 0 ? 'neg' : ''}`}>{fmt(live)}</span>
                             </button>
-                            <button className="row-delete" onClick={() => removeAccount(acc)} aria-label={`Remove ${acc.name}`}>
+                            <button className="row-del" onClick={() => removeAccount(acc)} aria-label={`Remove ${acc.name}`}>
                               <X size={16} strokeWidth={2.25} aria-hidden="true" />
                             </button>
                           </>
@@ -4457,26 +4484,26 @@ export default function App() {
                 </ul>
               )}
               <div className="transfers">
-                <div className="card__title-row">
+                <div className="card-title-row">
                   <h2>Transfers</h2>
                   {(!hasAccounts || transfersByWhen.length === 0) && (
-                    <p className="card__empty">{hasAccounts ? 'No transfers yet.' : 'No accounts yet.'}</p>
+                    <p className="card-empty">{hasAccounts ? 'No transfers yet.' : 'No accounts yet.'}</p>
                   )}
                 </div>
                 {transfersByWhen.length > 0 && (
-                  <ul className="card__list">
+                  <ul className="card-list">
                         {(transfersAll ? transfersByWhen : transfersByWhen.slice(0, TRANSFERS_SHOWN)).map((t) => {
                           const from = transferSide(t.fromId);
                           const to = transferSide(t.toId);
                           const editingThis = rowEdit?.list === 'transfers' && rowEdit.id === t.id;
                           return (
-                            <li key={t.id} data-row={t.id} className={editingThis ? 'is-editing' : ''}>
+                            <li key={t.id} data-row={t.id}>
                               {editingThis ? (
                                 <form className="row-edit transfer-form" onSubmit={(e) => saveTransfer(e, t)} onChange={clearTransferValidity}>
                                   {transferFields(t)}
                                   <div className="row-edit-actions">
-                                    <button type="submit" className="btn btn--ink">Save</button>
-                                    <button type="button" className="btn btn--outline" onClick={() => setRowEdit(null)}>
+                                    <button type="submit" className="btn ink">Save</button>
+                                    <button type="button" className="btn outline" onClick={() => setRowEdit(null)}>
                                       Cancel
                                     </button>
                                   </div>
@@ -4485,25 +4512,25 @@ export default function App() {
                                 <>
                                   <button
                                     type="button"
-                                    className="row-button"
+                                    className="row-open"
                                     onClick={() => setRowEdit({ list: 'transfers', id: t.id })}
                                     aria-label={`Edit transfer of ${fmt(t.amount)} from ${from} to ${to}`}
                                   >
-                                    <span className="u-grow">
-                                      <span className="transfers__route">
+                                    <span className="grow">
+                                      <span className="transfer-route">
                                         {t.fromId === null && <Banknote size={14} aria-hidden="true" />}
                                         {from}
                                         <ArrowRight size={14} strokeWidth={2.5} aria-hidden="true" />
-                                        <span className="u-sr-only"> to </span>
+                                        <span className="sr-only"> to </span>
                                         {t.toId === null && <Banknote size={14} aria-hidden="true" />}
                                         {to}
                                       </span>
-                                      <small className="u-muted">{[t.note, entryStamp(t, todayStr)].filter(Boolean).join(' · ')}</small>
+                                      <small className="muted">{[t.note, entryStamp(t, todayStr)].filter(Boolean).join(' · ')}</small>
                                     </span>
-                                    <span className="u-num">{fmt(t.amount)}</span>
+                                    <span className="num">{fmt(t.amount)}</span>
                                   </button>
                                   <button
-                                    className="row-delete"
+                                    className="row-del"
                                     onClick={() =>
                                       removeWithUndo('transfers', t, `Deleted transfer, ${fmt(t.amount)} back in ${from}.`)
                                     }
@@ -4521,7 +4548,7 @@ export default function App() {
                 {transfersByWhen.length > TRANSFERS_SHOWN && (
                       <button
                         type="button"
-                        className="text-btn transfers__more"
+                        className="text-btn transfers-more"
                         aria-expanded={transfersAll}
                         onClick={() => setTransfersAll((v) => !v)}
                       >
@@ -4530,18 +4557,18 @@ export default function App() {
                     )}
               </div>
               <div className="goals">
-                <div className="card__title-row">
+                <div className="card-title-row">
                   <h2>Savings goals</h2>
                   {data.goals.length === 0 ? (
-                    <p className="card__empty">No savings goals yet.</p>
+                    <p className="card-empty">No savings goals yet.</p>
                   ) : (
-                    <span className="u-num u-muted">
+                    <span className="num muted">
                       {fmt(round2(data.goals.reduce((sum, g) => sum + goalProgress(g).saved, 0)))} set aside
                     </span>
                   )}
                 </div>
                 {data.goals.length > 0 && (
-                  <ul className="card__list">
+                  <ul className="card-list">
                     {data.goals.map((goal) => {
                       const progress = goalProgress(goal);
                       const open = openGoal === goal.id;
@@ -4549,10 +4576,10 @@ export default function App() {
                       const panelId = `goal-${goal.id}`;
                       const history = [...goal.contributions].sort((a, b) => b.date.localeCompare(a.date));
                       return (
-                        <li key={goal.id} data-row={goal.id} className={`goal-row ${open ? 'is-open' : ''} ${progress.done ? 'is-done' : ''}`}>
+                        <li key={goal.id} data-row={goal.id} className={`goal-row ${open ? 'is-open' : ''} ${progress.done ? 'is-done-g' : ''}`}>
                           <button
                             type="button"
-                            className="row-button"
+                            className="row-open"
                             aria-expanded={open}
                             aria-controls={panelId}
                             onClick={() => {
@@ -4561,17 +4588,17 @@ export default function App() {
                               setOpenGoal(open ? null : goal.id);
                             }}
                           >
-                            <span className="u-grow">
+                            <span className="grow">
                               {goal.name}
                               {progress.done ? (
                                 <span className="goal-badge">Reached</span>
                               ) : (
-                                <small className="u-muted">{fmt(progress.remaining)} to go</small>
+                                <small className="muted">{fmt(progress.remaining)} to go</small>
                               )}
                             </span>
-                            <span className="u-num amount-stack">
+                            <span className="num loan-amt">
                               {fmt(progress.saved)}
-                              <small className="u-muted">of {fmt(goal.target)}</small>
+                              <small className="muted">of {fmt(goal.target)}</small>
                             </span>
                           </button>
                           <div className="goal-meta">
@@ -4583,7 +4610,7 @@ export default function App() {
                               aria-valuemax={100}
                               aria-valuenow={Math.round(progress.pct)}
                             >
-                              <i style={{ width: `${progress.pct}%` }} />
+                              <i style={{ '--pct': progress.pct / 100 }} />
                             </div>
                             <span className="goal-pct">{Math.round(progress.pct)}%</span>
                           </div>
@@ -4591,30 +4618,30 @@ export default function App() {
                             <div className="goal-panel" id={panelId}>
                               {editingGoal ? (
                                 <form className="row-edit" onSubmit={(e) => saveGoal(e, goal)}>
-                                  <label className="field u-grow">
+                                  <label className="field grow">
                                     <span>Goal</span>
                                     <input name="name" type="text" defaultValue={goal.name} maxLength={NAME_MAX} required autoFocus onInput={textLock} />
                                   </label>
-                                  <label className="field field--amount">
+                                  <label className="field amount">
                                     <span>Target</span>
                                     <input name="target" type="text" inputMode="decimal" defaultValue={goal.target} autoComplete="off" required onInput={numericLock} />
                                   </label>
                                   <div className="row-edit-actions">
-                                    <button type="submit" className="btn btn--ink">Save</button>
-                                    <button type="button" className="btn btn--danger" onClick={() => deleteGoal(goal)}>
+                                    <button type="submit" className="btn ink">Save</button>
+                                    <button type="button" className="btn danger" onClick={() => deleteGoal(goal)}>
                                       Delete
                                     </button>
-                                    <button type="button" className="btn btn--outline" onClick={() => setGoalEditId(null)}>
+                                    <button type="button" className="btn outline" onClick={() => setGoalEditId(null)}>
                                       Cancel
                                     </button>
                                   </div>
                                 </form>
                               ) : (
-                                <form className="row-edit row-edit--pay" onSubmit={(e) => handleAddMoney(e, goal)}>
+                                <form className="row-edit pay-form" onSubmit={(e) => handleAddMoney(e, goal)}>
                                   {contributionFields(null)}
                                   <div className="row-edit-actions">
-                                    <button type="submit" className="btn btn--ink">Add money</button>
-                                    <button type="button" className="btn btn--outline" onClick={() => setGoalEditId(goal.id)}>
+                                    <button type="submit" className="btn ink">Add money</button>
+                                    <button type="button" className="btn outline" onClick={() => setGoalEditId(goal.id)}>
                                       Edit goal
                                     </button>
                                   </div>
@@ -4622,19 +4649,19 @@ export default function App() {
                               )}
                               {history.length > 0 && (
                                 <>
-                                  <h2 className="panel-subhead">Set aside</h2>
+                                  <h2 className="loan-sub">Set aside</h2>
                                   <ul className="pay-list" aria-label={`Money set aside for ${goal.name}`}>
                                     {history.map((c) =>
                                       contributionEditId === c.id ? (
-                                        <li key={c.id} className="is-editing">
-                                          <form className="row-edit row-edit--pay" onSubmit={(e) => saveContribution(e, goal, c)}>
+                                        <li key={c.id}>
+                                          <form className="row-edit pay-form" onSubmit={(e) => saveContribution(e, goal, c)}>
                                             {contributionFields(c)}
                                             <div className="row-edit-actions">
-                                              <button type="submit" className="btn btn--outline">Save</button>
-                                              <button type="button" className="btn btn--danger" onClick={() => removeContribution(goal, c)}>
+                                              <button type="submit" className="btn outline">Save</button>
+                                              <button type="button" className="btn danger" onClick={() => removeContribution(goal, c)}>
                                                 Remove
                                               </button>
-                                              <button type="button" className="btn btn--outline" onClick={() => setContributionEditId(null)}>
+                                              <button type="button" className="btn outline" onClick={() => setContributionEditId(null)}>
                                                 Cancel
                                               </button>
                                             </div>
@@ -4644,7 +4671,7 @@ export default function App() {
                                         <li key={c.id}>
                                           <span>{shortDay(c.date)}</span>
                                           <span className="pay-note">{accountOf(c.accountId)?.name || ''}</span>
-                                          <span className="u-num">{fmt(c.amount)}</span>
+                                          <span className="num">{fmt(c.amount)}</span>
                                           <button type="button" className="pay-act" onClick={() => setContributionEditId(c.id)} aria-label={`Edit the ${fmt(c.amount)} set aside`}>
                                             Edit
                                           </button>
@@ -4662,7 +4689,7 @@ export default function App() {
                   </ul>
                 )}
                 {data.goals.length > 0 && (
-                  <p className="u-hint">
+                  <p className="hint">
                     Money set aside leaves the account you take it from, but it is not spending, so your daily number
                     and monthly total stay the same.
                   </p>
@@ -4673,7 +4700,7 @@ export default function App() {
 
           {isSettings && (
             <>
-              <section className="card card--pad" aria-labelledby="settings-heading">
+              <section className="card pad" aria-labelledby="settings-heading">
                 <h1 id="settings-heading">Settings</h1>
                 <div className="settings-sub">
                   <h2>Budget</h2>
@@ -4730,7 +4757,7 @@ export default function App() {
                       Leftovers carry to tomorrow; overspending carries as debt.
                     </small>
                     {perDayLeft > 0 && perDayLeft !== baseDaily && (
-                      <small className="field__suggest">
+                      <small className="suggest">
                         {fmt(perDayLeft)} a day lasts until {periodLastDay}.{' '}
                         <button
                           type="button"
@@ -4754,7 +4781,7 @@ export default function App() {
                       `warn at ${data.settings.alertThreshold}%`
                     ].join(' · ')}
                   />
-                  <div className="fold__body" id="budget-more" hidden={!budgetMoreOpen}>
+                  <div className="fold-body" id="budget-more" hidden={!budgetMoreOpen}>
                   <div className="field">
                     <span id="budget-days-label">Daily budget on</span>
                     <fieldset className="radio-seg" aria-labelledby="budget-days-label">
@@ -4800,14 +4827,14 @@ export default function App() {
                 </form>
               </section>
 
-              <section className="card card--pad" id="categories-settings" aria-labelledby="cats-heading">
+              <section className="card pad" id="categories-settings" aria-labelledby="cats-heading">
                 <h2 id="cats-heading">Expense categories</h2>
                 <div className="cat-head" aria-hidden="true">
                   <span>Ink</span>
                   <span>Name</span>
                   <span>Used</span>
                 </div>
-                <ul className="card__list cat-list">
+                <ul className="card-list cat-list">
                   {categories.map((cat) => {
                     const used = usageOf(cat.name);
                     return (
@@ -4835,11 +4862,11 @@ export default function App() {
                             }
                           }}
                         />
-                        <span className="u-num u-muted cat-count">
+                        <span className="num muted cat-count">
                           {used > 0 && (
                             <>
                               <span aria-hidden="true">{used}</span>
-                              <span className="u-sr-only">
+                              <span className="sr-only">
                                 {used} expense{used === 1 ? '' : 's'}
                               </span>
                             </>
@@ -4847,7 +4874,7 @@ export default function App() {
                         </span>
                         <button
                           type="button"
-                          className="row-delete"
+                          className="row-del"
                           onClick={() => (catMove?.id === cat.id ? setCatMove(null) : deleteCategory(cat))}
                           disabled={categories.length <= 1}
                           aria-label={`Remove category ${cat.name}`}
@@ -4872,10 +4899,10 @@ export default function App() {
                               </select>
                             </label>
                             <div className="row-edit-actions">
-                              <button type="button" className="btn btn--ink" onClick={() => moveAndRemoveCategory(cat, catMove.to)}>
+                              <button type="button" className="btn ink" onClick={() => moveAndRemoveCategory(cat, catMove.to)}>
                                 Move and remove
                               </button>
-                              <button type="button" className="btn btn--outline" onClick={() => setCatMove(null)}>
+                              <button type="button" className="btn outline" onClick={() => setCatMove(null)}>
                                 Keep {cat.name}
                               </button>
                             </div>
@@ -4886,22 +4913,22 @@ export default function App() {
                   })}
                 </ul>
                 <form onSubmit={handleAddCategory} className="add-form">
-                  <label className="field u-grow">
+                  <label className="field grow">
                     <span>New category</span>
                     <input name="catName" type="text" placeholder={categoryExample} maxLength={CATEGORY_NAME_MAX} required onInput={textLock} />
                   </label>
-                  <button type="submit" className="btn btn--ink">Add</button>
+                  <button type="submit" className="btn ink">Add</button>
                 </form>
               </section>
 
               {(canInstall || (IOS_NOT_INSTALLED && !installHintOff)) && (
-                <section className="card card--pad">
+                <section className="card pad">
                   <h2>Install</h2>
                   {canInstall ? (
                     <>
-                      <p className="card__note">Put stdynt on your home screen.</p>
+                      <p className="card-note">Put stdynt on your home screen.</p>
                       <div className="btn-row">
-                        <button type="button" onClick={install} className="btn btn--outline">
+                        <button type="button" onClick={install} className="btn outline">
                           <Smartphone size={16} strokeWidth={2} aria-hidden="true" />
                           Install stdynt
                         </button>
@@ -4909,11 +4936,11 @@ export default function App() {
                     </>
                   ) : (
                     <>
-                      <p className="card__note">
+                      <p className="card-note">
                         Tap Share, then Add to Home Screen. stdynt then opens full screen and works offline.
                       </p>
                       <div className="btn-row">
-                        <button type="button" onClick={hideInstallHint} className="btn btn--outline">
+                        <button type="button" onClick={hideInstallHint} className="btn outline">
                           Not now
                         </button>
                       </div>
@@ -4922,42 +4949,42 @@ export default function App() {
                 </section>
               )}
 
-              <section className="card card--pad">
+              <section className="card pad">
                 <h2>App</h2>
-                <p className="card__note">Get the newest version. Your data stays as it is.</p>
+                <p className="card-note">Get the newest version. Your data stays as it is.</p>
                 <div className="btn-row">
-                  <button type="button" onClick={checkForUpdate} disabled={updateState === 'checking'} className="btn btn--outline">
+                  <button type="button" onClick={checkForUpdate} disabled={updateState === 'checking'} className="btn outline">
                     <RefreshCw size={16} strokeWidth={2} aria-hidden="true" />
                     Check for updates
                   </button>
                 </div>
-                <p className="card__note" role="status" aria-live="polite">
+                <p className="card-note" role="status" aria-live="polite">
                   {updateState === 'idle' ? '' : updateLabel}
                 </p>
               </section>
 
-              <section className="card card--pad">
+              <section className="card pad">
                 <h2>Your data</h2>
-                <p className="card__note">Stored only on this device. Back up before switching phones.</p>
+                <p className="card-note">Stored only on this device. Back up before switching phones.</p>
                 <div className="btn-row">
                   <button
                     type="button"
                     onClick={exportJSON}
-                    className="btn btn--outline"
+                    className="btn outline"
                     disabled={!!fileBusy}
                     aria-busy={fileBusy === 'backup'}
                   >
                     <Download size={16} strokeWidth={2} aria-hidden="true" />
                     {fileBusy === 'backup' ? 'Saving…' : 'Back up'}
                   </button>
-                  <label className="btn btn--outline">
+                  <label className="btn outline">
                     <Upload size={16} strokeWidth={2} aria-hidden="true" /> Restore backup
-                    <input type="file" accept=".json,application/json" onChange={importJSON} className="u-sr-only" />
+                    <input type="file" accept=".json,application/json" onChange={importJSON} className="sr-only" />
                   </label>
                   <button
                     type="button"
                     onClick={exportCSV}
-                    className="btn btn--outline"
+                    className="btn outline"
                     disabled={!!fileBusy}
                     aria-busy={fileBusy === 'csv'}
                   >
@@ -4978,7 +5005,7 @@ export default function App() {
                       'All data deleted.'
                     )
                   }
-                  className="btn btn--danger btn--full"
+                  className="btn danger full"
                 >
                   Delete all data
                 </button>
@@ -4992,24 +5019,24 @@ export default function App() {
       <div className="live-slot" role="status">
         {undo ? (
           <div
-            className="toast toast--undo"
+            className="toast undo-toast"
             onMouseEnter={holdUndoTimer}
             onMouseLeave={armUndoTimer}
             onFocus={holdUndoTimer}
             onBlur={armUndoTimer}
           >
             <span>{undo.message}</span>
-            <button type="button" className="toast__undo" onClick={undo.restore}>
+            <button type="button" className="toast-undo" onClick={undo.restore}>
               Undo
             </button>
           </div>
         ) : notice ? (
-          <div className={`toast ${noticeIsError ? 'toast--error' : ''}`}>{notice}</div>
+          <div className={`toast ${noticeIsError ? 'error' : ''}`}>{notice}</div>
         ) : (
           hasNewBuild && (
-            <div className="toast toast--update">
+            <div className="toast update-toast">
               <span>New version available</span>
-              <button type="button" className="toast__undo" onClick={() => window.location.reload()}>
+              <button type="button" className="toast-undo" onClick={() => window.location.reload()}>
                 Refresh
               </button>
             </div>
@@ -5019,22 +5046,22 @@ export default function App() {
 
       <dialog
         ref={sheetRef}
-        className={`sheet ${sheetClosing ? 'is-closing' : ''}`}
+        className={`sheet ${sheetClosing ? 'closing' : ''}`}
         onCancel={(e) => {
           e.preventDefault();
           closeSheet();
         }}
         onClick={(e) => e.target === sheetRef.current && closeSheet()}
       >
-        <form onSubmit={handleExpenseSubmit} className="sheet__body">
+        <form onSubmit={handleExpenseSubmit} className="sheet-body">
           <div
-            className="sheet__head"
+            className="sheet-head"
             onPointerDown={onSheetDragStart}
             onPointerMove={onSheetDragMove}
             onPointerUp={onSheetDragEnd}
             onPointerCancel={onSheetDragEnd}
           >
-            <span className="sheet__grip" aria-hidden="true" />
+            <span className="sheet-grip" aria-hidden="true" />
             <h2>
               {editing
                 ? editing.note?.trim()
@@ -5049,7 +5076,7 @@ export default function App() {
             </button>
           </div>
           {!editing && (
-            <div className="radio-seg radio-seg--kind" role="group" aria-label="Entry type">
+            <div className="radio-seg kind-seg" role="group" aria-label="Entry type">
               {[
                 ['expense', 'Expense'],
                 ['income', 'Income']
@@ -5070,23 +5097,23 @@ export default function App() {
           )}
           {!editing && sheetMemory.recent.length > 0 && (
             <div className="recent" role="group" aria-labelledby="recent-name">
-              <span id="recent-name" className="recent__name">
+              <span id="recent-name" className="recent-name">
                 Recent
               </span>
-              <div className="recent__row">
+              <div className="recent-row">
                 {sheetMemory.recent.map((r) => (
-                  <button key={r.id} type="button" className="recent__pick" onClick={() => fillFromRecent(r)}>
-                    <span className="recent__what">{r.note || (sheetKind === 'income' ? 'Income' : r.category)}</span>
-                    <span className="u-num recent__amount">{fmt(r.amount)}</span>
+                  <button key={r.id} type="button" className="recent-pick" onClick={() => fillFromRecent(r)}>
+                    <span className="recent-what">{r.note || (sheetKind === 'income' ? 'Income' : r.category)}</span>
+                    <span className="num recent-amt">{fmt(r.amount)}</span>
                   </button>
                 ))}
               </div>
             </div>
           )}
-          <label className="field field--big">
+          <label className="field big-amount">
             <span>Amount</span>
-            <div className="amount-field">
-              <span className="amount-field__sym">{sym}</span>
+            <div className="amount-wrap">
+              <span className="amount-sym">{sym}</span>
               <input
                 ref={amountInputRef}
                 name="amount"
@@ -5105,7 +5132,7 @@ export default function App() {
               <span id="chips-name">Category</span>
               <button
                 type="button"
-                className="chips__legend-link"
+                className="legend-link"
                 onClick={() =>
                   closeSheet(() => {
                     go('settings');
@@ -5130,7 +5157,7 @@ export default function App() {
             ))}
           </fieldset>
           {hasAccounts && (
-            <fieldset className="chips chips--account">
+            <fieldset className="chips account-chips">
               <legend>{sheetKind === 'income' ? 'Paid into' : 'Paid from'}</legend>
               <label className="chip">
                 <input type="radio" name="accountId" value="" defaultChecked />
@@ -5164,7 +5191,7 @@ export default function App() {
               }}
             />
             {sheetSubMatch && (
-              <small id="note-hint" className="u-hint">
+              <small id="note-hint" className="hint">
                 Already a subscription:{' '}
                 {sheetSubMatch.billingDay
                   ? "it's logged on its billing day."
@@ -5177,10 +5204,10 @@ export default function App() {
               <option key={n} value={n} />
             ))}
           </datalist>
-          <div className="sheet__when">
+          <div className="sheet-when">
             <button
               type="button"
-              className="sheet__when-sum"
+              className="when-sum"
               aria-expanded={sheetWhenOpen || !!sheetDateReason}
               aria-controls="sheet-when-fields"
               onClick={() => {
@@ -5189,10 +5216,10 @@ export default function App() {
                 if (next) requestAnimationFrame(() => sheetRef.current?.querySelector('input[name="date"]')?.focus());
               }}
             >
-              <span className="sheet__when-label">{whenLabel}</span>
-              <span className="sheet__when-change">{sheetWhenOpen || sheetDateReason ? 'Done' : 'Change'}</span>
+              <span className="when-label">{whenLabel}</span>
+              <span className="when-change">{sheetWhenOpen || sheetDateReason ? 'Done' : 'Change'}</span>
             </button>
-            <div className="sheet__row sheet__row--when" id="sheet-when-fields" hidden={!(sheetWhenOpen || sheetDateReason)}>
+            <div className="sheet-row when" id="sheet-when-fields" hidden={!(sheetWhenOpen || sheetDateReason)}>
               <label className="field">
                 <span>Date</span>
                 <input
@@ -5209,7 +5236,7 @@ export default function App() {
                 <input name="time" type="time" onChange={(e) => setSheetTime(e.currentTarget.value)} />
               </label>
               {sheetDateReason && (
-                <small id="date-hint" className="u-hint sheet__when-hint">
+                <small id="date-hint" className="hint when-hint">
                   {sheetDateReason === 'closed-month'
                     ? "That month started fresh, so this won't change today's number."
                     : "Before your daily budget started, so this won't change today's number."}
@@ -5217,8 +5244,8 @@ export default function App() {
               )}
             </div>
           </div>
-          <div className="sheet__foot">
-            <button type="submit" className="btn btn--ink btn--full btn--big">
+          <div className="sheet-foot">
+            <button type="submit" className="btn ink full big">
               {editing ? 'Save changes' : sheetKind === 'income' ? 'Log income' : 'Log expense'}
             </button>
           </div>
@@ -5227,16 +5254,16 @@ export default function App() {
 
       <dialog
         ref={addSheetRef}
-        className={`sheet ${addSheetClosing ? 'is-closing' : ''}`}
+        className={`sheet ${addSheetClosing ? 'closing' : ''}`}
         onCancel={(e) => {
           e.preventDefault();
           closeAddSheet();
         }}
         onClick={(e) => e.target === addSheetRef.current && closeAddSheet()}
       >
-        <div className="sheet__body">
-          <div className="sheet__head" onPointerDown={onAddSheetDragStart} onPointerMove={onAddSheetDragMove} onPointerUp={onAddSheetDragEnd} onPointerCancel={onAddSheetDragEnd}>
-            <span className="sheet__grip" aria-hidden="true" />
+        <div className="sheet-body">
+          <div className="sheet-head" onPointerDown={onAddSheetDragStart} onPointerMove={onAddSheetDragMove} onPointerUp={onAddSheetDragEnd} onPointerCancel={onAddSheetDragEnd}>
+            <span className="sheet-grip" aria-hidden="true" />
             <h2>{view === 'accounts' ? ADD_SHEET_LABELS[addSheetKind] : ADD_FORMS[view] ? ADD_FORMS[view][1] : 'Add'}</h2>
             <button type="button" className="icon-btn" onClick={() => closeAddSheet()} aria-label="Close">
               <X size={22} strokeWidth={2} />
@@ -5244,8 +5271,8 @@ export default function App() {
           </div>
           {view === 'subs' && (
             <form id="add-subs" onSubmit={handleAddSub} className="add-form">
-            <fieldset className="radio-seg u-grow-full">
-              <legend className="u-sr-only">New or existing</legend>
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">New or existing</legend>
               <label>
                 <input type="radio" name="origin" value="new" checked={subOrigin === 'new'} onChange={() => setSubOrigin('new')} />
                 <span>New</span>
@@ -5255,26 +5282,26 @@ export default function App() {
                 <span>Existing</span>
               </label>
             </fieldset>
-            <label className="field u-grow">
+            <label className="field grow">
               <span>Service</span>
               <input name="name" type="text" maxLength={NAME_MAX} required autoFocus onInput={textLock} />
             </label>
-            <label className="field field--amount">
+            <label className="field amount">
               <span>Per month</span>
               <input name="cost" type="text" inputMode="decimal" autoComplete="off" required onInput={numericLock} />
             </label>
-            <label className="field field--day">
+            <label className="field day">
               <span>Billing day</span>
               <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" onInput={clearValidity} />
             </label>
             {accountField(defaultAccountId, 'Paid from')}
-            <button type="submit" className="btn btn--ink">Add</button>
+            <button type="submit" className="btn ink">Add</button>
           </form>
         )}
         {view === 'loans' && (
           <form id="add-loans" onSubmit={handleAddDebt} className="add-form loans-form">
-            <fieldset className="radio-seg u-grow-full">
-              <legend className="u-sr-only">Direction</legend>
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">Direction</legend>
               <label>
                 <input type="radio" name="type" value="i_owe" checked={loanKind === 'i_owe'} onChange={() => setLoanKind('i_owe')} />
                 <span>You owe</span>
@@ -5288,8 +5315,8 @@ export default function App() {
                 <span>Installment</span>
               </label>
             </fieldset>
-            <fieldset className="radio-seg u-grow-full">
-              <legend className="u-sr-only">New or existing</legend>
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">New or existing</legend>
               <label>
                 <input type="radio" name="origin" value="new" checked={loanOrigin === 'new'} onChange={() => setLoanOrigin('new')} />
                 <span>New</span>
@@ -5299,11 +5326,11 @@ export default function App() {
                 <span>Existing</span>
               </label>
             </fieldset>
-            <label className="field u-grow">
+            <label className="field grow">
               <span>{loanKind === 'installment' ? 'What' : 'Who'}</span>
               <input name="person" type="text" maxLength={NAME_MAX} required autoFocus onInput={textLock} />
             </label>
-            <label className="field field--amount">
+            <label className="field amount">
               <span>{loanKind === 'installment' ? 'Total' : 'Amount'}</span>
               <input name="amount" type="text" inputMode="decimal" autoComplete="off" required onInput={numericLock} />
             </label>
@@ -5312,7 +5339,7 @@ export default function App() {
               <input name="date" type="date" defaultValue={todayStr} max={todayStr} required />
             </label>
             {loanKind !== 'installment' && (
-              <label className="field u-grow-full">
+              <label className="field grow-full">
                 <span>What for</span>
                 <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
               </label>
@@ -5320,18 +5347,18 @@ export default function App() {
             <PlanFields key={loanKind} todayStr={todayStr} optional={loanKind !== 'installment'} />
             {accountField(defaultAccountId, loanKind === 'installment' ? 'Paid from' : undefined)}
             {loanOrigin === 'existing' && (
-              <label className="field field--amount">
+              <label className="field amount">
                 <span>Already paid</span>
                 <input name="paidBefore" type="text" inputMode="decimal" placeholder="Optional" autoComplete="off" onInput={numericLock} />
               </label>
             )}
-            <button type="submit" className="btn btn--ink">Add</button>
+            <button type="submit" className="btn ink">Add</button>
           </form>
         )}
         {view === 'accounts' && addSheetKind === 'account' && (
           <form id="add-accounts" onSubmit={handleAddAccount} className="add-form">
-            <fieldset className="radio-seg u-grow-full">
-              <legend className="u-sr-only">Kind of account</legend>
+            <fieldset className="radio-seg grow-full">
+              <legend className="sr-only">Kind of account</legend>
               {ACCOUNT_TYPES.map(([value, label]) => (
                 <label key={value}>
                   <input
@@ -5345,7 +5372,7 @@ export default function App() {
                 </label>
               ))}
             </fieldset>
-            <label className="field u-grow">
+            <label className="field grow">
               <span>{accountTypeLabel(addAccountType)}</span>
               <select
                 name="preset"
@@ -5365,7 +5392,7 @@ export default function App() {
               </select>
             </label>
             {addAccountPreset === CUSTOM_PRESET && (
-              <label className="field u-grow">
+              <label className="field grow">
                 <span>Custom name</span>
                 <input
                   name="name"
@@ -5378,17 +5405,17 @@ export default function App() {
                 />
               </label>
             )}
-            <label className="field field--balance">
+            <label className="field balance">
               <span>Starting balance</span>
               <input name="balance" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" onInput={numericLock} />
             </label>
-            <button type="submit" className="btn btn--ink">Add</button>
+            <button type="submit" className="btn ink">Add</button>
           </form>
         )}
         {view === 'accounts' && addSheetKind === 'transfer' && (
           <form id="add-transfer" onSubmit={handleTransfer} onChange={clearTransferValidity} className="add-form">
-            <div className="transfers__sides">
-              <label className="field u-grow">
+            <div className="transfer-sides">
+              <label className="field grow">
                 <span>From</span>
                 <select name="fromId" defaultValue={sideValue(transferDefaults.fromId)} autoFocus>
                   {sideOptions()}
@@ -5406,50 +5433,50 @@ export default function App() {
               >
                 <ArrowLeftRight size={18} aria-hidden="true" />
               </button>
-              <label className="field u-grow">
+              <label className="field grow">
                 <span>To</span>
                 <select name="toId" defaultValue={sideValue(transferDefaults.toId)}>
                   {sideOptions()}
                 </select>
               </label>
             </div>
-            <label className="field field--big">
+            <label className="field big-amount">
               <span>Amount</span>
-              <div className="amount-field">
-                <span className="amount-field__sym">{sym}</span>
+              <div className="amount-wrap">
+                <span className="amount-sym">{sym}</span>
                 <input name="amount" type="text" inputMode="decimal" placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required onInput={numericLock} />
               </div>
             </label>
-            <div className="transfers__tail">
+            <div className="transfer-tail">
               <label className="field">
                 <span>Date</span>
                 <input name="date" type="date" defaultValue={todayStr} max={todayStr} required />
               </label>
-              <label className="field u-grow">
+              <label className="field grow">
                 <span>Note</span>
                 <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
               </label>
             </div>
-            <div className="sheet__foot">
-              <button type="submit" className="btn btn--ink btn--full btn--big">Transfer</button>
+            <div className="sheet-foot">
+              <button type="submit" className="btn ink full big">Transfer</button>
             </div>
           </form>
         )}
         {view === 'accounts' && addSheetKind === 'goal' && (
           <form id="add-goal" onSubmit={handleAddGoal} className="add-form">
-            <label className="field u-grow">
+            <label className="field grow">
               <span>Goal</span>
               <input name="name" type="text" maxLength={NAME_MAX} required autoFocus onInput={textLock} />
             </label>
-            <label className="field field--big">
+            <label className="field big-amount">
               <span>Target</span>
-              <div className="amount-field">
-                <span className="amount-field__sym">{sym}</span>
+              <div className="amount-wrap">
+                <span className="amount-sym">{sym}</span>
                 <input name="target" type="text" inputMode="decimal" autoComplete="off" required onInput={numericLock} />
               </div>
             </label>
-            <div className="sheet__foot">
-              <button type="submit" className="btn btn--ink btn--full btn--big">Set goal</button>
+            <div className="sheet-foot">
+              <button type="submit" className="btn ink full big">Set goal</button>
             </div>
           </form>
         )}
@@ -5466,8 +5493,8 @@ export default function App() {
         }}
         onClick={(e) => e.target === introRef.current && skipIntro()}
       >
-        <form className="sheet__body" onSubmit={finishIntroSetup}>
-          <div className="sheet__head">
+        <form className="sheet-body" onSubmit={finishIntroSetup}>
+          <div className="sheet-head">
             <h2 id="intro-title">
               {introStep === 1 ? 'Welcome to stdynt!' : introStep === 2 ? 'Set your allowance' : "You're set up"}
             </h2>
@@ -5475,7 +5502,7 @@ export default function App() {
               <X size={22} strokeWidth={2} />
             </button>
           </div>
-          <p className="u-sr-only" role="status">
+          <p className="sr-only" role="status">
             {introStep === 3 && introSaved
               ? `You can spend ${introMoney(introSaved.daily, introSaved.currency)} today.`
               : ''}
@@ -5483,10 +5510,10 @@ export default function App() {
 
           {introStep === 1 && (
             <>
-              <div className="sheet__foot">
+              <div className="sheet-foot">
                 <button
                   type="button"
-                  className="btn btn--ink btn--full btn--big"
+                  className="btn ink full big"
                   onClick={() => {
                     setIntroStep(2);
                     setIntroError('');
@@ -5495,13 +5522,13 @@ export default function App() {
                   Set my allowance
                 </button>
                 {canInstall && (
-                  <button type="button" className="btn btn--outline btn--full" onClick={install}>
+                  <button type="button" className="btn outline full" onClick={install}>
                     <Smartphone size={16} strokeWidth={2} aria-hidden="true" />
                     Install as an app
                   </button>
                 )}
                 {!canInstall && IOS_NOT_INSTALLED && (
-                  <p className="u-hint">Tap Share, then Add to Home Screen.</p>
+                  <p className="hint">Tap Share, then Add to Home Screen.</p>
                 )}
                 <button type="button" className="text-btn" onClick={skipIntro}>
                   Set up later
@@ -5541,18 +5568,18 @@ export default function App() {
                   aria-describedby="intro-daily"
                 />
               </label>
-              <p id="intro-daily" className="u-hint">
+              <p id="intro-daily" className="hint">
                 {introDaily > 0
                   ? `That's about ${introMoney(introDaily)} a day until ${periodLastDay}.`
                   : 'Enter your allowance to see your daily number.'}
               </p>
               {introError && (
-                <p className="u-hint intro__error" role="alert">
+                <p className="hint intro-error" role="alert">
                   {introError}
                 </p>
               )}
-              <div className="sheet__foot">
-                <button type="submit" className="btn btn--ink btn--full btn--big">
+              <div className="sheet-foot">
+                <button type="submit" className="btn ink full big">
                   See my daily number
                 </button>
                 <button
@@ -5571,19 +5598,19 @@ export default function App() {
 
           {introStep === 3 && introSaved && (
             <>
-              <p className="intro__lead">
+              <p className="intro-lead">
                 Here's your daily number for the rest of this month. Spend less and the rest carries to tomorrow.
               </p>
-              <div className="well intro__well">
-                <span className="intro__label">You can spend today</span>
+              <div className="well intro-well" style={{ '--level': '1' }}>
+                <span className="intro-label">You can spend today</span>
                 <span className="stamp">
-                  <span className="stamp__sym" aria-hidden="true">{introSaved.currency}</span>
+                  <span className="stamp-sym" aria-hidden="true">{introSaved.currency}</span>
                   {formatNumber(introSaved.daily, introSaved.currency)}
                 </span>
                 <span className="date-stamp" aria-hidden="true">{stampDate(todayStr)}</span>
               </div>
-              <div className="sheet__foot">
-                <button type="button" className="btn btn--ink btn--full btn--big" autoFocus onClick={() => leaveIntro(true)}>
+              <div className="sheet-foot">
+                <button type="button" className="btn ink full big" autoFocus onClick={() => leaveIntro(true)}>
                   Log my first expense
                 </button>
                 <button type="button" className="text-btn" onClick={() => leaveIntro(false)}>
@@ -5604,16 +5631,16 @@ export default function App() {
         onClick={(e) => e.target === askRef.current && closeAsk()}
       >
         {ask && (
-          <div className="confirm__body">
+          <div className="confirm-body">
             <h2 id="ask-title">{ask.title}</h2>
             <p id="ask-body">{ask.body}</p>
-            <div className="confirm__actions">
-              <button type="button" className="btn btn--outline" autoFocus onClick={closeAsk}>
+            <div className="confirm-actions">
+              <button type="button" className="btn outline" autoFocus onClick={closeAsk}>
                 {ask.cancelLabel}
               </button>
               <button
                 type="button"
-                className={`btn ${ask.danger ? 'btn--danger' : 'btn--ink'}`}
+                className={`btn ${ask.danger ? 'danger' : 'ink'}`}
                 onClick={() => {
                   const run = ask.onConfirm;
                   closeAsk();
