@@ -66,7 +66,7 @@ import {
   PLAN_FREQUENCIES,
   accountBalance
 } from './budget.js';
-import { prefersReducedMotion, useNearViewport } from './perf.jsx';
+import { prefersReducedMotion, useNearViewport, useWindowedRows } from './perf.jsx';
 import { ConsentCard } from './ConsentBanner.jsx';
 
 // The liquid canvas is an enhancement over the CSS level, so it loads as its
@@ -1364,6 +1364,11 @@ export default function App() {
       else day.spent += Number(e.amount) || 0;
     }
   }
+  const historyDaysShown = historySort === 'date' ? historyDays.slice(0, historyPages * HISTORY_DAYS_STEP) : [];
+  const historyRowsShown = historySort === 'date' ? [] : historyEntries.slice(0, historyPages * HISTORY_ROWS_STEP);
+  const historyWindowKey = `${historySort}:${historyCat}:${historyNeedle}:${historyEntries.length}`;
+  const dayWindow = useWindowedRows(historyDaysShown.length, { resetKey: `d:${historyWindowKey}` });
+  const rowWindow = useWindowedRows(historyRowsShown.length, { resetKey: `r:${historyWindowKey}` });
   const dayOpen = (date) => historyFiltered !== dayToggles.has(date);
   const toggleDay = (date) =>
     setDayToggles((s) => {
@@ -1786,7 +1791,7 @@ export default function App() {
   const entryLabel = (exp) => exp.note || (exp.kind === 'income' ? 'Income' : exp.category);
   const entryAmount = (exp) => (exp.kind === 'income' ? `+${fmt(exp.amount)}` : fmt(exp.amount));
 
-  const renderHistoryRow = (exp, underDay) => {
+  const renderHistoryRow = (exp, underDay, vindex) => {
     const isIncome = exp.kind === 'income';
     const stamp = underDay
       ? (exp.date || todayStr) === todayStr
@@ -1797,7 +1802,7 @@ export default function App() {
       .filter(Boolean)
       .join(' · ');
     return (
-      <li key={exp.id} className="list-row" data-row={exp.id}>
+      <li key={exp.id} className="list-row" data-row={exp.id} data-vindex={vindex}>
         <button
           type="button"
           className="row-open"
@@ -3620,13 +3625,17 @@ export default function App() {
                       </p>
                     )}
                     {historySort === 'date' ? (
-                      <ul className="list">
-                        {historyDays.slice(0, historyPages * HISTORY_DAYS_STEP).map((day, i) => {
+                      <ul className="list" ref={dayWindow.setListEl}>
+                        {dayWindow.padTop > 0 && (
+                          <li className="vpad" aria-hidden="true" style={{ height: dayWindow.padTop }} />
+                        )}
+                        {historyDaysShown.slice(dayWindow.start, dayWindow.end).map((day, j) => {
+                          const i = dayWindow.start + j;
                           const open = dayOpen(day.date);
                           const n = day.entries.length;
                           const panelId = `history-day-${i}`;
                           return (
-                            <li key={`${day.date}:${i}`} className="history-day">
+                            <li key={`${day.date}:${i}`} className="history-day" data-vindex={i}>
                               <button
                                 type="button"
                                 className="day-head"
@@ -3656,12 +3665,21 @@ export default function App() {
                             </li>
                           );
                         })}
+                        {dayWindow.padBottom > 0 && (
+                          <li className="vpad" aria-hidden="true" style={{ height: dayWindow.padBottom }} />
+                        )}
                       </ul>
                     ) : (
-                      <ul className="list">
-                        {historyEntries
-                          .slice(0, historyPages * HISTORY_ROWS_STEP)
-                          .map((exp) => renderHistoryRow(exp, false))}
+                      <ul className="list" ref={rowWindow.setListEl}>
+                        {rowWindow.padTop > 0 && (
+                          <li className="vpad" aria-hidden="true" style={{ height: rowWindow.padTop }} />
+                        )}
+                        {historyRowsShown
+                          .slice(rowWindow.start, rowWindow.end)
+                          .map((exp, j) => renderHistoryRow(exp, false, rowWindow.start + j))}
+                        {rowWindow.padBottom > 0 && (
+                          <li className="vpad" aria-hidden="true" style={{ height: rowWindow.padBottom }} />
+                        )}
                       </ul>
                     )}
                     {(() => {

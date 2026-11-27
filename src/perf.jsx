@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 export const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -43,4 +43,97 @@ export const useNearViewport = (margin = NEAR_MARGIN) => {
   }, [node, near, margin]);
 
   return [setNode, near];
+};
+
+// Windowed rows: only the rows a visitor can see (plus a screen of overscan)
+// are in the document. The rest of the list is two empty spacers, so heights,
+// scroll position and native scrolling stay identical to the full list.
+const ROW_ESTIMATE = 48;
+const ROW_OVERSCAN = 900;
+const ROW_INITIAL = 40;
+
+// Index of the row that contains offset y (offsets is ascending, length count+1).
+const rowAt = (offsets, y) => {
+  let lo = 0;
+  let hi = offsets.length - 2;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (offsets[mid] <= y) lo = mid;
+    else hi = mid - 1;
+  }
+  return Math.max(0, lo);
+};
+
+export const useWindowedRows = (count, { estimate = ROW_ESTIMATE, overscan = ROW_OVERSCAN, resetKey = '' } = {}) => {
+  const [listEl, setListEl] = useState(null);
+  const heightsRef = useRef(new Map());
+  const [measured, setMeasured] = useState(0);
+  const [win, setWin] = useState({ start: 0, end: Math.min(count, ROW_INITIAL) });
+
+  // A different list (other sort, other filter) starts from the estimate again.
+  useLayoutEffect(() => {
+    heightsRef.current.clear();
+    setMeasured((v) => v + 1);
+    setWin({ start: 0, end: Math.min(count, ROW_INITIAL) });
+  }, [resetKey]);
+
+  const offsets = useMemo(() => {
+    const acc = new Float64Array(count + 1);
+    for (let i = 0; i < count; i += 1) acc[i + 1] = acc[i] + (heightsRef.current.get(i) ?? estimate);
+    return acc;
+    // `measured` bumps when a rendered row reports a height that differs.
+  }, [count, estimate, measured]);
+
+  useLayoutEffect(() => {
+    if (!listEl || count === 0) return undefined;
+    let frame = 0;
+
+    const update = () => {
+      const top = listEl.getBoundingClientRect().top + window.scrollY;
+      const from = Math.max(0, window.scrollY - top - overscan);
+      const to = window.scrollY + window.innerHeight - top + overscan;
+      const start = rowAt(offsets, from);
+      const end = Math.min(count, rowAt(offsets, Math.max(from, to)) + 1);
+      setWin((w) => (w.start === start && w.end === end ? w : { start, end }));
+
+      let changed = false;
+      for (const row of listEl.children) {
+        const i = Number(row.dataset.vindex);
+        if (!Number.isInteger(i)) continue;
+        const h = row.getBoundingClientRect().height;
+        if (h > 0 && Math.abs((heightsRef.current.get(i) ?? estimate) - h) > 0.5) {
+          heightsRef.current.set(i, h);
+          changed = true;
+        }
+      }
+      if (changed) setMeasured((v) => v + 1);
+    };
+
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        update();
+      });
+    };
+
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [listEl, offsets, count, overscan, estimate]);
+
+  const start = Math.min(win.start, count);
+  const end = Math.min(win.end, count);
+  return {
+    setListEl,
+    start,
+    end,
+    padTop: offsets[start] ?? 0,
+    padBottom: Math.max(0, (offsets[count] ?? 0) - (offsets[end] ?? 0))
+  };
 };
