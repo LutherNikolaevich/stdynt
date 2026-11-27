@@ -2275,3 +2275,974 @@
     }
   }
 }
+
+/* Loans on desktop: the phone card list becomes a sortable data table with a
+   next-payments pane beside it. Below 1280px the table is not rendered, so
+   phones keep the compact stack of cards. */
+@layer deferred {
+  .loans-desktop {
+    display: none;
+  }
+
+  @media (width >= 1280px) {
+    /* The table needs the full window: at 1200px the rail leaves too little
+       room for seven columns, and the pane still keeps its 4 of 12. */
+    .app.view-loans {
+      max-width: 90rem;
+      overflow-x: clip;
+    }
+
+    .loans-mobile {
+      display: none;
+    }
+
+    .loans-desktop {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .loans-main {
+      grid-column: span 8;
+      min-width: 0;
+      overflow: visible;
+      contain: layout style;
+    }
+
+    .loans-main.card.pad {
+      padding: 24px 12px;
+    }
+
+    .loans-side {
+      position: sticky;
+      top: 6.25rem;
+      grid-column: span 4;
+      min-width: 0;
+    }
+  }
+
+  .loans-main .loan-filter {
+    margin: 0.75rem 0 0.5rem;
+  }
+
+  .loan-table {
+    width: 100%;
+    margin-top: 0.25rem;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .col-loan {
+    width: 19%;
+  }
+
+  .col-direction {
+    width: 16.5%;
+  }
+
+  .col-balance {
+    width: 15%;
+  }
+
+  .col-progress {
+    width: 14%;
+  }
+
+  .col-installments {
+    width: 10%;
+  }
+
+  .col-next {
+    width: 12.5%;
+  }
+
+  .col-actions {
+    width: 13%;
+  }
+
+  .loan-table th,
+  .loan-table td {
+    padding: 4px 6px;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .loan-table thead th {
+    position: sticky;
+    top: 5.25rem;
+    z-index: 3;
+    height: auto;
+    padding-block: 6px;
+    line-height: 1.15;
+    background: var(--panel);
+    border-bottom: 1.5px solid var(--panel-line);
+    color: var(--text-3);
+    font-size: var(--text-caption);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* "Installments" breaks at its soft hyphen in the narrow column rather than
+     spilling across its neighbours. */
+  .loan-table thead th:nth-child(5) {
+    white-space: normal;
+    hyphens: manual;
+  }
+
+  .loan-th-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: none;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+
+  .loan-th-sort.is-active {
+    color: var(--text);
+  }
+
+  .loan-th-arrow {
+    font-size: 0.9em;
+    opacity: 0.55;
+  }
+
+  .loan-th-sort.is-active .loan-th-arrow {
+    opacity: 1;
+  }
+
+  .loan-table tbody th,
+  .loan-table tbody td {
+    height: 40px;
+    border-top: 1px solid var(--panel-line);
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .loan-table tbody tr.loan-tr:hover > * {
+    background: var(--wash-4);
+  }
+
+  .loan-table tbody tr.is-paid .loan-name,
+  .loan-table tbody tr.is-paid .loan-balance > span {
+    color: var(--text-2);
+  }
+
+  .loan-open {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    color: var(--text);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .loan-name {
+    font-size: var(--text-ui);
+    font-weight: 700;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  .loan-subline {
+    color: var(--text-2);
+    font-size: var(--text-caption);
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .loan-balance > span,
+  .loan-balance > small {
+    display: block;
+    white-space: nowrap;
+  }
+
+  .loan-balance > small {
+    color: var(--text-2);
+    font-size: var(--text-caption);
+    line-height: 1.2;
+  }
+
+  .loan-progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .loan-progress-bar {
+    position: relative;
+    flex: 1 1 auto;
+    display: block;
+    min-width: 24px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--panel-line);
+    overflow: hidden;
+  }
+
+  .loan-progress-bar i {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--sun);
+    transform: scaleX(var(--pct, 0));
+    transform-origin: left center;
+    transition: transform 0.75s var(--spring-soft);
+  }
+
+  .loan-progress-pct {
+    flex: none;
+    width: 3.2ch;
+    color: var(--text-2);
+    font-size: var(--text-caption);
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .loan-installments {
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .loan-next > span,
+  .loan-next > small {
+    display: block;
+    line-height: 1.2;
+  }
+
+  .loan-next > small {
+    color: var(--text-2);
+    font-size: var(--text-caption);
+  }
+
+  .loan-next.is-overdue > span,
+  .loan-next.is-overdue > small {
+    color: var(--red);
+    font-weight: 700;
+  }
+
+  .loan-row-actions {
+    text-align: right;
+  }
+
+  .loan-pay {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    min-height: 0;
+    padding: 0 9px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    color: var(--ground);
+    background: var(--text);
+    font-size: var(--text-caption);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .loan-pay:active {
+    transform: scale(0.94);
+  }
+
+  .loan-menu {
+    position: relative;
+    display: inline-block;
+    margin-inline-start: 5px;
+    vertical-align: middle;
+  }
+
+  .loan-menu > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 1.5px solid var(--control-border);
+    border-radius: var(--radius-pill);
+    color: var(--text-2);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .loan-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .loan-menu[open] > summary {
+    color: var(--text);
+    background: var(--wash-8);
+  }
+
+  .loan-menu-list {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    min-width: 190px;
+    padding: 6px;
+    border: 1px solid var(--panel-line);
+    border-radius: var(--radius-md);
+    background: var(--grain), var(--panel-2);
+    box-shadow: var(--shadow-float);
+  }
+
+  .loan-menu-list button {
+    justify-content: flex-start;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    background: none;
+    font-size: var(--text-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .loan-menu-list button:hover,
+  .loan-menu-list button:focus-visible {
+    background: var(--wash-8);
+  }
+
+  .loan-menu-list button.is-danger {
+    color: var(--red);
+  }
+
+  .loan-table .loan-detail > td {
+    height: auto;
+    padding: 0 8px 12px;
+    background: var(--wash-3);
+    white-space: normal;
+  }
+
+  .loan-detail .loan-panel {
+    margin: 0;
+    padding-inline: 4px;
+    border-top: 1px dashed var(--panel-line);
+  }
+
+  .loan-detail .pay-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 2rem;
+    border-top: 0;
+    color: var(--text-2);
+    font-size: var(--text-ui);
+  }
+
+  .loans-side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .loans-side h2 {
+    font-size: var(--text-h3);
+  }
+
+  .due-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .due-list li {
+    display: grid;
+    grid-template-columns: 3.6rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 2.25rem;
+    border-top: 1px solid var(--panel-line);
+    font-size: var(--text-ui);
+  }
+
+  .due-list li:first-child {
+    border-top: 0;
+  }
+
+  .due-date {
+    color: var(--text-2);
+    font-family: var(--font-stamp);
+    font-stretch: var(--stamp-stretch);
+    font-size: var(--text-label);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .due-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .due-amount {
+    font-weight: 700;
+  }
+
+  .due-list li.is-overdue .due-date,
+  .due-list li.is-overdue .due-amount {
+    color: var(--red);
+  }
+
+  .loans-side-empty {
+    margin: 0;
+  }
+
+  .due-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin: 0;
+    padding-top: var(--space-3);
+    border-top: 1.5px solid var(--panel-line);
+    font-size: var(--text-label);
+    color: var(--text-2);
+  }
+
+  .due-total > :first-child {
+    color: var(--text);
+    font-size: var(--text-h3);
+    font-weight: 700;
+  }
+
+  .payoff {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding-top: var(--space-4);
+    border-top: 1.5px solid var(--panel-line);
+  }
+
+  .payoff-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .payoff-head h3 {
+    font-size: var(--text-label);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-2);
+  }
+
+  .payoff-head > span {
+    font-weight: 700;
+  }
+
+  .payoff p {
+    margin: 0;
+    font-size: var(--text-caption);
+  }
+
+  /* Subscriptions: phones keep the card list above; the table and renewal
+     strip are the desktop answer to "when is my next bill, and how much
+     leaves this month?". */
+  .subs-desktop {
+    display: none;
+  }
+
+  @media (width >= 1280px) {
+    .subs-mobile {
+      display: none;
+    }
+
+    .subs-card {
+      display: block;
+      overflow: visible;
+      contain: none;
+      padding: var(--space-6);
+    }
+
+    .subs-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--space-6);
+      padding-bottom: var(--space-5);
+      border-bottom: 1.5px solid var(--panel-line);
+    }
+
+    .subs-title {
+      font-family: var(--font-ui);
+      font-size: var(--text-label);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-2);
+    }
+
+    .subs-lede {
+      margin-top: var(--space-1);
+      font-size: var(--text-body-sm);
+      color: var(--text);
+    }
+
+    .subs-total {
+      display: flex;
+      flex: none;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: var(--space-2);
+    }
+
+    .subs-total-figure {
+      display: flex;
+      align-items: baseline;
+      gap: 0.25rem;
+      font-family: var(--font-stamp);
+      font-stretch: var(--stamp-stretch);
+      font-weight: 700;
+      font-size: clamp(2.5rem, 4.2vw, 3.5rem);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+    }
+
+    .subs-total-figure small {
+      font-family: var(--font-ui);
+      font-size: var(--text-body-lg);
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .subs-toggle {
+      display: flex;
+      padding: 0.1875rem;
+      border: 1px solid var(--control-border);
+      border-radius: var(--radius-pill);
+      background: var(--field-bg);
+    }
+
+    .subs-toggle button {
+      min-height: 1.75rem;
+      padding: 0 0.75rem;
+      border-radius: var(--radius-pill);
+      color: var(--text-2);
+      font-size: var(--text-caption);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      transition: background-color var(--dur-ui) ease, color var(--dur-ui) ease;
+    }
+
+    .subs-toggle button[aria-pressed='true'] {
+      background: var(--text);
+      color: var(--ground);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .subs-toggle button[aria-pressed='false']:hover {
+        color: var(--text);
+        background: var(--wash-6);
+      }
+    }
+
+    .subs-toggle button:focus-visible,
+    .subs-sort:focus-visible,
+    .subs-actions-btn:focus-visible,
+    .subs-menu button:focus-visible {
+      outline: 2px solid var(--text);
+      outline-offset: 2px;
+    }
+
+    .subs-upcoming {
+      margin-top: var(--space-5);
+      padding-bottom: var(--space-5);
+      border-bottom: 1.5px solid var(--panel-line);
+    }
+
+    .subs-upcoming-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+
+    .subs-upcoming-head h2 {
+      font-family: var(--font-ui);
+      font-size: var(--text-label);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-2);
+    }
+
+    .subs-upcoming-head span {
+      font-size: var(--text-label);
+      color: var(--text-2);
+    }
+
+    .subs-upcoming-head strong {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .subs-upcoming-empty {
+      font-size: var(--text-body-sm);
+      color: var(--text-2);
+    }
+
+    .subs-upcoming-strip {
+      display: flex;
+      gap: var(--space-2);
+      min-width: 0;
+      padding-bottom: 2px;
+      overflow-x: auto;
+      list-style: none;
+      scrollbar-width: thin;
+    }
+
+    .subs-upcoming-strip li {
+      display: grid;
+      flex: none;
+      gap: 0.125rem;
+      min-width: 9.25rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--panel-line);
+      border-radius: var(--radius-md);
+      background: var(--panel-2);
+    }
+
+    .subs-upcoming-strip li.is-soon {
+      border-color: color-mix(in oklab, var(--warn) 60%, transparent);
+      background: color-mix(in oklab, var(--warn) 12%, var(--panel-2));
+    }
+
+    .ub-date {
+      font-size: var(--text-caption);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-2);
+    }
+
+    .subs-upcoming-strip li.is-soon .ub-date {
+      color: var(--warn);
+    }
+
+    .ub-name {
+      overflow: hidden;
+      font-size: var(--text-ui);
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ub-amount {
+      font-size: var(--text-body-sm);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .subs-table-wrap {
+      margin-top: var(--space-2);
+    }
+
+    .subs-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .subs-table th {
+      padding: var(--space-3) 0.5rem;
+      border-bottom: 1.5px solid var(--panel-line);
+      text-align: start;
+    }
+
+    .subs-table th:first-child,
+    .subs-table td:first-child {
+      padding-inline-start: 0;
+    }
+
+    .subs-table th:last-child,
+    .subs-table td:last-child {
+      padding-inline-end: 0;
+    }
+
+    .subs-table .subs-col-day {
+      width: 6.5rem;
+    }
+
+    .subs-table .subs-col-next {
+      width: 8rem;
+    }
+
+    .subs-table .subs-col-account {
+      width: 10rem;
+    }
+
+    .subs-table .subs-col-monthly {
+      width: 6rem;
+      text-align: end;
+    }
+
+    .subs-table .subs-col-annual {
+      width: 6.5rem;
+      text-align: end;
+    }
+
+    .subs-table .subs-col-actions {
+      width: 3rem;
+    }
+
+    .subs-sort {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      color: var(--text-2);
+      font-size: var(--text-caption);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      transition: color var(--dur-ui) ease;
+    }
+
+    .subs-sort-arrow {
+      display: inline-flex;
+      opacity: 0;
+      transition: opacity var(--dur-ui) ease, transform var(--dur-ui) ease;
+    }
+
+    .subs-sort-arrow.is-asc {
+      opacity: 1;
+      transform: rotate(180deg);
+    }
+
+    .subs-sort-arrow.is-desc {
+      opacity: 1;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .subs-sort:hover {
+        color: var(--text);
+      }
+
+      .subs-sort:hover .subs-sort-arrow {
+        opacity: 0.55;
+      }
+
+      .subs-sort:hover .subs-sort-arrow.is-asc,
+      .subs-sort:hover .subs-sort-arrow.is-desc {
+        opacity: 1;
+      }
+    }
+
+    .subs-table td {
+      padding: var(--space-3) 0.5rem;
+      border-bottom: 1px solid var(--panel-line);
+      font-size: var(--text-body-sm);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .subs-table tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    /* The shared flash marks a changed row with a ::before rule. On a table
+       row that pseudo-element becomes an anonymous extra cell and shifts
+       every column, so keep the flash background and drop the rule here. */
+    .subs-table tr.row-fresh::before {
+      content: none;
+    }
+
+    .subs-logo {
+      display: inline-grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 0.5rem;
+      background: oklch(74% 0.11 var(--logo-hue));
+      color: oklch(22% 0.03 var(--logo-hue));
+      font-family: var(--font-stamp);
+      font-size: var(--text-caption);
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      vertical-align: middle;
+    }
+
+    .subs-service-name {
+      display: inline-flex;
+      flex-direction: column;
+      margin-inline-start: var(--space-3);
+      font-weight: 600;
+      vertical-align: middle;
+    }
+
+    .subs-paused-badge {
+      color: var(--text-3);
+      font-size: var(--text-nano);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .subs-table tr.is-paused .subs-service-name,
+    .subs-table tr.is-paused .subs-money {
+      color: var(--text-3);
+    }
+
+    .subs-day {
+      color: var(--text-2);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .sub-count {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.1875rem 0.5rem;
+      border: 1px solid var(--panel-line);
+      border-radius: var(--radius-pill);
+      color: var(--text-2);
+      font-size: var(--text-caption);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .sub-count.is-soon {
+      border-color: color-mix(in oklab, var(--warn) 65%, transparent);
+      background: color-mix(in oklab, var(--warn) 16%, transparent);
+      color: var(--warn);
+    }
+
+    .sub-count.is-paused,
+    .sub-count.is-none {
+      border-style: dashed;
+      color: var(--text-3);
+    }
+
+    .subs-account {
+      overflow: hidden;
+      color: var(--text-2);
+      text-overflow: ellipsis;
+    }
+
+    .subs-money {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      text-align: end;
+    }
+
+    .subs-annual {
+      color: var(--text-2);
+    }
+
+    .subs-actions {
+      position: relative;
+      text-align: end;
+    }
+
+    .subs-actions-btn {
+      display: grid;
+      place-items: center;
+      width: 2.25rem;
+      height: 2.25rem;
+      margin-inline-start: auto;
+      border-radius: var(--radius-sm);
+      color: var(--text-2);
+      opacity: 0;
+      transition: opacity var(--dur-ui) ease, background-color var(--dur-ui) ease, color var(--dur-ui) ease;
+    }
+
+    .subs-table tbody tr:hover .subs-actions-btn,
+    .subs-table tbody tr:focus-within .subs-actions-btn,
+    .subs-table tbody tr.is-menu-open .subs-actions-btn {
+      opacity: 1;
+    }
+
+    @media (hover: none) {
+      .subs-actions-btn {
+        opacity: 1;
+      }
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .subs-actions-btn:hover,
+      .subs-table tbody tr.is-menu-open .subs-actions-btn {
+        background: var(--wash-8);
+        color: var(--text);
+      }
+    }
+
+    .subs-menu {
+      position: absolute;
+      z-index: 12;
+      top: calc(100% - 0.25rem);
+      inset-inline-end: 0;
+      min-width: 8.5rem;
+      padding: var(--space-1);
+      border: 1px solid var(--panel-line);
+      border-radius: var(--radius-md);
+      background: var(--grain), var(--sheen), var(--panel);
+      box-shadow: var(--shadow-float);
+      list-style: none;
+    }
+
+    .subs-menu button {
+      display: block;
+      width: 100%;
+      padding: 0.5rem 0.625rem;
+      border-radius: var(--radius-xs);
+      color: var(--text);
+      font-size: var(--text-ui);
+      font-weight: 600;
+      text-align: start;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .subs-menu button:hover {
+        background: var(--wash-10);
+      }
+
+      .subs-menu button.is-danger:hover {
+        background: var(--wash-danger);
+      }
+    }
+
+    .subs-menu button.is-danger {
+      color: var(--red);
+    }
+
+    .subs-edit-panel {
+      margin-top: var(--space-4);
+      padding-top: var(--space-4);
+      border-top: 1.5px solid var(--panel-line);
+    }
+
+    .subs-edit-title {
+      flex-basis: 100%;
+      color: var(--text-2);
+      font-size: var(--text-label);
+      font-weight: 700;
+    }
+  }
+}

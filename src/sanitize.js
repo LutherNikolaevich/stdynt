@@ -138,6 +138,7 @@ export function sanitizeData(raw, { todayStr, currencies, defaultCategory, defau
       since: isRealDate(s.since) ? s.since : todayStr,
       lastLogged: logged,
       ...(s.existing === true ? { existing: true } : {}),
+      ...(s.paused === true ? { paused: true } : {}),
       ...accountLink(s)
     };
   });

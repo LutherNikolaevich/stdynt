@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  MoreHorizontal,
   Wallet,
   ArrowRight,
   ArrowLeftRight,
@@ -54,6 +55,7 @@ import {
   parseAmount,
   suggestDaily,
   dueBillingDates,
+  nextBillDate,
   loanEntry,
   loanRemaining,
   startSubscription,
@@ -357,6 +359,24 @@ const ordinal = (n) => {
 };
 
 const shortDay = (ds) => parseDate(ds).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+const serviceInitials = (name) => {
+  const words = String(name || '')
+    .replace(/[^\p{L}\p{N} ]/gu, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 0) return '•';
+  return (words.length === 1 ? words[0].slice(0, 2) : words[0][0] + words[1][0]).toUpperCase();
+};
+
+const logoHue = (name) => {
+  let h = 0;
+  for (const ch of String(name || '')) h = (h * 31 + (ch.codePointAt(0) || 0)) % 360;
+  return h;
+};
+
+const SUB_SORT_KEYS = ['service', 'day', 'next', 'account', 'monthly', 'annual'];
 
 const INCOME_FILTER = '\u0000income';
 
@@ -770,10 +790,28 @@ export default function App() {
   const [noticeIsError, setNoticeIsError] = useState(initialDropped > 0);
   const [pickedCat, setPickedCat] = useState(null);
   const [periodOffset, setPeriodOffset] = useState(0);
+  const [subMenuId, setSubMenuId] = useState(null);
   useEffect(() => {
     if (view !== 'categories') setPeriodOffset(0);
     setFabOpen(false);
+    setSubMenuId(null);
   }, [view]);
+
+  useEffect(() => {
+    if (subMenuId === null) return;
+    const onDown = (e) => {
+      if (!e.target.closest?.('.subs-actions')) setSubMenuId(null);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setSubMenuId(null);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [subMenuId]);
   const [hoverCat, setHoverCat] = useState(null);
   const [focusCat, setFocusCat] = useState(null);
   const sheetRef = useRef(null);
@@ -805,6 +843,9 @@ export default function App() {
   const [catMove, setCatMove] = useState(null);
   const [rowEdit, setRowEdit] = useState(null);
   const [loanFilter, setLoanFilter] = useState('all');
+  const [loanSort, setLoanSort] = useState({ key: 'due', dir: 'asc' });
+  const [subSort, setSubSort] = useState({ key: 'next', dir: 'asc' });
+  const [subTotalMode, setSubTotalMode] = useState('mo');
   const [payEdit, setPayEdit] = useState(null);
   const [openGoal, setOpenGoal] = useState(null);
   const [goalEditId, setGoalEditId] = useState(null);
@@ -1256,7 +1297,50 @@ export default function App() {
 
   const monthlyExpenses = data.expenses.filter(inPeriod);
   const subLoggedThisPeriod = (sub) => paidBeforeTracking(sub, period) || monthlyExpenses.some((e) => e.subId === sub.id);
-  const subsMonthly = data.subscriptions.reduce((s, sub) => s + Number(sub.cost || 0), 0);
+  const activeSubs = data.subscriptions.filter((sub) => !sub.paused);
+  const subsMonthly = activeSubs.reduce((s, sub) => s + Number(sub.cost || 0), 0);
+  const subsAnnual = round2(subsMonthly * 12);
+  const subRows = data.subscriptions.map((sub) => {
+    const next = nextBillDate(sub, todayStr);
+    return { sub, next, days: next ? daysBetween(todayStr, next) : null };
+  });
+  const subSorters = {
+    service: (r) => r.sub.name.toLowerCase(),
+    day: (r) => Math.round(Number(r.sub.billingDay)) || 99,
+    next: (r) => r.next || '9999-12-31',
+    account: (r) => (accountLabel(r.sub.accountId) || 'Cash').toLowerCase(),
+    monthly: (r) => Number(r.sub.cost) || 0,
+    annual: (r) => (Number(r.sub.cost) || 0) * 12
+  };
+  const subSorted = [...subRows].sort((a, b) => {
+    const av = subSorters[subSort.key](a);
+    const bv = subSorters[subSort.key](b);
+    const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+    return (subSort.dir === 'asc' ? cmp : -cmp) || a.sub.name.localeCompare(b.sub.name);
+  });
+  const toggleSubSort = (key) =>
+    setSubSort((s) => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }));
+  const nextSub = subRows.filter((r) => r.next).sort((a, b) => a.next.localeCompare(b.next))[0];
+  const upcomingBills = [];
+  for (const sub of activeSubs) {
+    const day = Math.round(Number(sub.billingDay));
+    if (!(day >= 1 && day <= 31)) continue;
+    const start = parseDate(todayStr);
+    for (let m = 0; m < 2; m++) {
+      const month = new Date(start.getFullYear(), start.getMonth() + m, 1);
+      const dim = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+      const date = toDateStr(new Date(month.getFullYear(), month.getMonth(), Math.min(day, dim)));
+      if (date >= todayStr && date <= addDays(todayStr, 30)) {
+        upcomingBills.push({ sub, date, days: daysBetween(todayStr, date) });
+      }
+    }
+  }
+  upcomingBills.sort((a, b) => a.date.localeCompare(b.date) || a.sub.name.localeCompare(b.sub.name));
+  const upcomingTotal = upcomingBills.reduce((s, b) => s + Number(b.sub.cost || 0), 0);
+  const editingSub =
+    rowEdit?.list === 'subscriptions' ? data.subscriptions.find((s) => s.id === rowEdit.id) || null : null;
+  const billInLabel = (days) =>
+    days === 0 ? 'Due today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
   const {
     spent: spentMonthlyExpenses,
     earned: incomeMonthly,
@@ -1408,6 +1492,48 @@ export default function App() {
   };
   const shownLoans = loanRows.filter(
     ({ sum }) => loanFilter === 'all' || (loanFilter === 'active' ? sum.status !== 'paid' : sum.status === loanFilter)
+  );
+  const loanName = (debt) => (debt.note || '').trim() || debt.person;
+  const activeLoans = loanRows.filter(({ sum }) => sum.status !== 'paid');
+  const sortedLoans = [...shownLoans].sort((a, b) => {
+    const sign = loanSort.dir === 'asc' ? 1 : -1;
+    const value = ({ debt, sum }) =>
+      loanSort.key === 'balance' ? sum.remaining : loanSort.key === 'progress' ? sum.progress : sum.nextDue || '9999-12-31';
+    const av = value(a);
+    const bv = value(b);
+    if (av === bv) return loanName(a.debt).localeCompare(loanName(b.debt));
+    return av < bv ? -sign : sign;
+  });
+  const toggleLoanSort = (key) =>
+    setLoanSort((s) => ({ key, dir: s.key === key ? (s.dir === 'asc' ? 'desc' : 'asc') : key === 'due' ? 'asc' : 'desc' }));
+  const loanSortHeader = (key, label) => {
+    const active = loanSort.key === key;
+    return (
+      <th scope="col" aria-sort={active ? (loanSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+        <button type="button" className={`loan-th-sort ${active ? 'is-active' : ''}`} onClick={() => toggleLoanSort(key)}>
+          {label}
+          <span className="loan-th-arrow" aria-hidden="true">
+            {active ? (loanSort.dir === 'asc' ? '↑' : '↓') : '↕'}
+          </span>
+        </button>
+      </th>
+    );
+  };
+  const loanAggregate = activeLoans.reduce(
+    (acc, { debt, sum }) => ({ total: acc.total + (Number(debt.amount) || 0), paid: acc.paid + sum.paid }),
+    { total: 0, paid: 0 }
+  );
+  const loanPayoffPct = loanAggregate.total > 0 ? Math.round((loanAggregate.paid / loanAggregate.total) * 100) : 0;
+  const duesTimeline = activeLoans
+    .flatMap(({ debt, sum }) =>
+      sum.schedule
+        .filter((r) => r.status !== 'paid' && r.due)
+        .map((r) => ({ due: r.due, amount: Math.round((r.amount - r.paid) * 100) / 100, name: loanName(debt), id: debt.id }))
+    )
+    .sort((a, b) => a.due.localeCompare(b.due));
+  const upcomingDues = duesTimeline.slice(0, 6);
+  const duesThisMonth = round2(
+    duesTimeline.filter((d) => d.due.slice(0, 7) === todayStr.slice(0, 7)).reduce((s, d) => s + d.amount, 0)
   );
 
   const sheetCategories =
@@ -2022,9 +2148,25 @@ export default function App() {
     replaceWithUndo('subscriptions', sub, after, `Saved ${fields.name}.`);
   };
 
+  const toggleSubPaused = (sub) => {
+    const pausing = !sub.paused;
+    const after = pausing
+      ? { ...sub, paused: true }
+      : { ...sub, paused: false, lastLogged: todayStr };
+    setSubMenuId(null);
+    replaceWithUndo(
+      'subscriptions',
+      sub,
+      after,
+      pausing ? `Paused ${sub.name}. It won't bill until you resume.` : `Resumed ${sub.name} from its next billing day.`
+    );
+  };
+
   useEffect(() => {
     if (storageCorrupted) return;
-    const dueNames = data.subscriptions.filter((s) => dueBillingDates(s, todayStr).length > 0).map((s) => s.name);
+    const dueNames = data.subscriptions
+      .filter((s) => !s.paused && dueBillingDates(s, todayStr).length > 0)
+      .map((s) => s.name);
     if (dueNames.length === 0) return;
     const firstId = Date.now();
     setData((d) => {
@@ -2033,6 +2175,7 @@ export default function App() {
       let i = 0;
       const lastBySub = new Map();
       for (const sub of d.subscriptions) {
+        if (sub.paused) continue;
         const dates = dueBillingDates(sub, todayStr);
         if (dates.length === 0) continue;
         for (const date of dates) {
@@ -3258,6 +3401,171 @@ export default function App() {
     )
   ) : null;
 
+  const dueLabel = (ds) => (ds.slice(0, 4) === todayStr.slice(0, 4) ? shortDay(ds) : `${shortDay(ds)} ${ds.slice(0, 4)}`);
+
+  // Shared by the phone cards and the desktop table: one loan's detail panel.
+  const loanPanel = (debt, sum) => {
+    const left = sum.remaining;
+    const payments = Array.isArray(debt.payments) ? debt.payments : [];
+    const iOwe = debt.type === 'i_owe';
+    const plan = debt.installment || null;
+    const paidUp = sum.status === 'paid';
+    const panelId = `loan-${debt.id}`;
+    const schedAll = !!loanMore[`${debt.id}:sched`];
+    const payAll = !!loanMore[`${debt.id}:pay`];
+    const editOpen = !!loanMore[`${debt.id}:edit`];
+    const firstOpen = sum.schedule.findIndex((r) => r.status !== 'paid');
+    const schedStart = firstOpen === -1 ? Math.max(0, sum.schedule.length - 4) : Math.max(0, firstOpen - 1);
+    const schedRows = schedAll || sum.schedule.length <= 4 ? sum.schedule : sum.schedule.slice(schedStart, schedStart + 4);
+    const payRows = payAll || payments.length <= 3 ? payments : payments.slice(-3);
+    const rowNote = (r) =>
+      r.status === 'paid'
+        ? 'Paid'
+        : [
+            r.status === 'partial' && `${fmt(r.paid)} paid`,
+            r.due && r.due < todayStr ? 'Overdue' : r.due === todayStr ? 'Due today' : r.status === 'unpaid' && 'Not paid'
+          ]
+            .filter(Boolean)
+            .join(' · ');
+    return (
+      <div className="loan-panel" id={panelId}>
+        {!paidUp && (
+          <form key={`${left}-${rowEdit?.pay ? 'pay' : 'open'}`} className="row-edit pay-form" onSubmit={(e) => recordPayment(e, debt)}>
+            <label className="field grow">
+              <span>{iOwe ? (plan ? 'You paid' : 'You paid back') : `${debt.person} paid back`}</span>
+              <input name="paid" type="text" inputMode="decimal" defaultValue={plan ? sum.nextAmount : undefined} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required autoFocus={!!rowEdit?.pay} onInput={numericLock} />
+            </label>
+            <label className="field date">
+              <span>On</span>
+              <input name="date" type="date" defaultValue={todayStr} max={todayStr} />
+            </label>
+            <label className="field grow">
+              <span>Note</span>
+              <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
+            </label>
+            {accountField(accountOf(debt.accountId)?.id, iOwe ? 'Paid from' : 'Paid into')}
+            <div className="row-edit-actions">
+              <button type="submit" className="btn ink">Record payment</button>
+              {plan && (
+                <button type="button" className="btn outline" onClick={() => settleDebt(debt, left, `Paid off ${debt.person}, ${fmt(left)}.`)}>
+                  Pay off {fmt(left)}
+                </button>
+              )}
+            </div>
+          </form>
+        )}
+        {sum.schedule.length > 0 && (
+          <>
+            <h2 className="loan-sub">Schedule</h2>
+            <ul className="pay-list" aria-label="Installment schedule">
+              {schedRows.map((r) => (
+                <li key={r.n} className={r.status === 'paid' ? 'is-done' : r.due && r.due < todayStr ? 'is-late' : ''}>
+                  <span>{r.due ? dueLabel(r.due) : `No. ${r.n}`}</span>
+                  <span className="pay-note">{rowNote(r)}</span>
+                  <span className="num">{fmt(r.amount)}</span>
+                </li>
+              ))}
+            </ul>
+            {sum.schedule.length > 4 && (
+              <button type="button" className="text-btn more-link" onClick={() => toggleMore(`${debt.id}:sched`)}>
+                {schedAll ? 'Show fewer' : `Show all ${sum.schedule.length}`}
+              </button>
+            )}
+          </>
+        )}
+        {payments.length > 0 && (
+          <>
+            <h2 className="loan-sub">Payments</h2>
+            <ul className="pay-list" aria-label="Payments so far">
+              {payRows.map((p) =>
+                payEdit === p.id ? (
+                  <li key={p.id}>
+                    <form className="row-edit pay-form" onSubmit={(e) => savePayment(e, debt, p)}>
+                      <label className="field grow">
+                        <span>Paid</span>
+                        <input name="paid" type="text" inputMode="decimal" defaultValue={p.amount} autoComplete="off" required autoFocus onInput={numericLock} />
+                      </label>
+                      <label className="field date">
+                        <span>On</span>
+                        <input name="date" type="date" defaultValue={p.date || todayStr} max={todayStr} />
+                      </label>
+                      <label className="field grow">
+                        <span>Note</span>
+                        <input name="note" type="text" defaultValue={p.note || ''} placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
+                      </label>
+                      <div className="row-edit-actions">
+                        <button type="submit" className="btn outline">Save</button>
+                        <button type="button" className="btn danger" onClick={() => removePayment(debt, p)}>
+                          Remove
+                        </button>
+                        <button type="button" className="btn outline" onClick={() => setPayEdit(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </li>
+                ) : (
+                  <li key={p.id}>
+                    <span>{p.date ? dueLabel(p.date) : 'Paid'}</span>
+                    <span className="pay-note">{[p.note, accountOf(p.accountId)?.name].filter(Boolean).join(' · ')}</span>
+                    <span className="num">{fmt(p.amount)}</span>
+                    <button type="button" className="pay-act" onClick={() => setPayEdit(p.id)} aria-label={`Edit the ${fmt(p.amount)} payment`}>
+                      Edit
+                    </button>
+                  </li>
+                )
+              )}
+            </ul>
+            {payments.length > 3 && (
+              <button type="button" className="text-btn more-link" onClick={() => toggleMore(`${debt.id}:pay`)}>
+                {payAll ? 'Show fewer' : `Show all ${payments.length}`}
+              </button>
+            )}
+          </>
+        )}
+        <Fold
+          id={`loan-edit-${debt.id}`}
+          label="Edit loan details"
+          className="loan-fold"
+          open={editOpen}
+          onToggle={() => toggleMore(`${debt.id}:edit`)}
+        />
+        <div className="fold-body" id={`loan-edit-${debt.id}`} hidden={!editOpen}>
+          <form className="row-edit" onSubmit={(e) => saveDebt(e, debt)}>
+            <label className="field grow">
+              <span>{iOwe ? 'Who or what' : 'Who'}</span>
+              <input name="person" type="text" defaultValue={debt.person} maxLength={NAME_MAX} required onInput={textLock} />
+            </label>
+            <label className="field amount">
+              <span>Total</span>
+              <input name="amount" type="text" inputMode="decimal" defaultValue={debt.amount} autoComplete="off" required onInput={numericLock} />
+            </label>
+            <label className="field grow">
+              <span>What for</span>
+              <input name="note" type="text" defaultValue={debt.note || ''} placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
+            </label>
+            <label className="field date">
+              <span>Since</span>
+              <input name="date" type="date" defaultValue={debt.date || ''} max={todayStr} />
+            </label>
+            <PlanFields plan={plan} todayStr={todayStr} optional />
+            <div className="row-edit-actions">
+              <button type="submit" className="btn outline">Save</button>
+              <button type="button" className="btn danger" onClick={() => removeLoan(debt)}>
+                Delete loan
+              </button>
+            </div>
+          </form>
+        </div>
+        <div className="row-edit-actions loan-close">
+          <button type="button" className="btn outline" onClick={() => setRowEdit(null)}>
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={`app view-${view}`}>
       <Shell
@@ -3821,86 +4129,302 @@ export default function App() {
           )}
 
           {view === 'subs' && (
-            <section className="card pad">
-              <div className="card-title-row">
-                <h1>Subscriptions</h1>
-                {data.subscriptions.length === 0 ? (
-                  <p className="card-empty">No subscriptions yet.</p>
-                ) : (
-                  <span className="num muted">{fmt(subsMonthly)} / month</span>
-                )}
-              </div>
-              {data.subscriptions.length > 0 && (
-                <ul className="card-list">
-                  {data.subscriptions.map((sub) => {
-                    const editingThis = rowEdit?.list === 'subscriptions' && rowEdit.id === sub.id;
-                    const meta = [
-                      sub.billingDay
-                        ? `Bills on the ${ordinal(sub.billingDay)}${subLoggedThisPeriod(sub) ? ' · logged' : ''}`
-                        : subLoggedThisPeriod(sub)
-                          ? 'Logged this month'
-                          : '',
-                      accountLabel(sub.accountId)
-                    ]
-                      .filter(Boolean)
-                      .join(' · ');
-                    return (
-                      <li key={sub.id} data-row={sub.id}>
-                        {editingThis ? (
-                          <form className="row-edit" onSubmit={(e) => saveSub(e, sub)}>
-                            <label className="field grow">
-                              <span>Service</span>
-                              <input name="name" type="text" defaultValue={sub.name} maxLength={NAME_MAX} required onInput={textLock} />
-                            </label>
-                            <label className="field amount">
-                              <span>Per month</span>
-                              <input name="cost" type="text" inputMode="decimal" defaultValue={sub.cost} autoComplete="off" required onInput={numericLock} />
-                            </label>
-                            <label className="field day">
-                              <span>Billing day</span>
-                              <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" defaultValue={sub.billingDay || ''} placeholder="None" onInput={clearValidity} />
-                            </label>
-                            {accountField(accountOf(sub.accountId)?.id, 'Paid from')}
-                            <div className="row-edit-actions">
-                              <button type="submit" className="btn ink">Save</button>
-                              <button type="button" className="btn outline" onClick={() => setRowEdit(null)}>
-                                Cancel
+            <>
+              <section className="card pad subs-mobile">
+                <div className="card-title-row">
+                  <h1>Subscriptions</h1>
+                  {data.subscriptions.length === 0 ? (
+                    <p className="card-empty">No subscriptions yet.</p>
+                  ) : (
+                    <span className="num muted">{fmt(subsMonthly)} / month</span>
+                  )}
+                </div>
+                {data.subscriptions.length > 0 && (
+                  <ul className="card-list">
+                    {data.subscriptions.map((sub) => {
+                      const editingThis = rowEdit?.list === 'subscriptions' && rowEdit.id === sub.id;
+                      const meta = [
+                        sub.paused
+                          ? 'Paused'
+                          : sub.billingDay
+                            ? `Bills on the ${ordinal(sub.billingDay)}`
+                            : '',
+                        accountLabel(sub.accountId)
+                      ]
+                        .filter(Boolean)
+                        .join(' · ');
+                      return (
+                        <li key={sub.id} data-row={sub.id}>
+                          {editingThis ? (
+                            <form className="row-edit" onSubmit={(e) => saveSub(e, sub)}>
+                              <label className="field grow">
+                                <span>Service</span>
+                                <input name="name" type="text" defaultValue={sub.name} maxLength={NAME_MAX} required onInput={textLock} />
+                              </label>
+                              <label className="field amount">
+                                <span>Per month</span>
+                                <input name="cost" type="text" inputMode="decimal" defaultValue={sub.cost} autoComplete="off" required onInput={numericLock} />
+                              </label>
+                              <label className="field day">
+                                <span>Billing day</span>
+                                <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" defaultValue={sub.billingDay || ''} placeholder="None" onInput={clearValidity} />
+                              </label>
+                              {accountField(accountOf(sub.accountId)?.id, 'Paid from')}
+                              <div className="row-edit-actions">
+                                <button type="submit" className="btn ink">Save</button>
+                                <button type="button" className="btn outline" onClick={() => setRowEdit(null)}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </form>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="row-open"
+                                onClick={() => setRowEdit({ list: 'subscriptions', id: sub.id })}
+                                aria-label={`Edit ${sub.name}, ${fmt(sub.cost)} a month`}
+                              >
+                                <span className="grow">
+                                  {sub.name}
+                                  {meta && <small className="muted">{meta}</small>}
+                                </span>
+                                <span className="num">{fmt(sub.cost)}</span>
                               </button>
-                            </div>
-                          </form>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              className="row-open"
-                              onClick={() => setRowEdit({ list: 'subscriptions', id: sub.id })}
-                              aria-label={`Edit ${sub.name}, ${fmt(sub.cost)} a month`}
-                            >
-                              <span className="grow">
-                                {sub.name}
-                                {meta && <small className="muted">{meta}</small>}
-                              </span>
-                              <span className="num">{fmt(sub.cost)}</span>
-                            </button>
-                            <button
-                              className="row-del"
-                              onClick={() => removeWithUndo('subscriptions', sub, `Removed ${sub.name}.`)}
-                              aria-label={`Remove ${sub.name}`}
-                            >
-                              <X size={16} strokeWidth={2.25} />
-                            </button>
-                          </>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
+                              <button
+                                className="row-del"
+                                onClick={() => removeWithUndo('subscriptions', sub, `Removed ${sub.name}.`)}
+                                aria-label={`Remove ${sub.name}`}
+                              >
+                                <X size={16} strokeWidth={2.25} />
+                              </button>
+                            </>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+
+              <section className="card pad subs-card subs-desktop" aria-labelledby="subs-title">
+                <div className="subs-head">
+                  <div className="subs-head-copy">
+                    <h1 id="subs-title" className="subs-title">Subscriptions</h1>
+                    {data.subscriptions.length > 0 && (
+                      <p className="subs-lede">
+                        {activeSubs.length} {activeSubs.length === 1 ? 'active plan' : 'active plans'}
+                        {nextSub ? ` · next bill ${shortDay(nextSub.next)}, ${billInLabel(nextSub.days).toLowerCase()}` : ' · none scheduled'}
+                      </p>
+                    )}
+                  </div>
+                  <div className="subs-total">
+                    <span className="subs-total-figure" aria-live="polite">
+                      {fmt(subTotalMode === 'mo' ? subsMonthly : subsAnnual)}
+                      <small>/{subTotalMode === 'mo' ? 'mo' : 'yr'}</small>
+                    </span>
+                    <div className="subs-toggle" role="group" aria-label="Show subscription total by">
+                      {[
+                        ['mo', `${fmt(subsMonthly)}/mo`, 'Monthly'],
+                        ['yr', `${fmt(subsAnnual)}/yr`, 'Yearly']
+                      ].map(([mode, amount, label]) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          aria-pressed={subTotalMode === mode}
+                          onClick={() => setSubTotalMode(mode)}
+                        >
+                          {amount}
+                          <span className="sr-only"> {label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {data.subscriptions.length === 0 ? (
+                  <p className="card-empty">No subscriptions yet. Add one to see renewal countdowns.</p>
+                ) : (
+                  <>
+                    <section className="subs-upcoming" aria-label="Upcoming bills in the next 30 days">
+                      <div className="subs-upcoming-head">
+                        <h2>Upcoming bills</h2>
+                        <span>
+                          Next 30 days · <strong>{fmt(upcomingTotal)}</strong>
+                        </span>
+                      </div>
+                      {upcomingBills.length === 0 ? (
+                        <p className="subs-upcoming-empty">No renewals in the next 30 days.</p>
+                      ) : (
+                        <ol className="subs-upcoming-strip">
+                          {upcomingBills.map(({ sub, date, days }) => (
+                            <li key={`${sub.id}:${date}`} className={days <= 3 ? 'is-soon' : ''}>
+                              <span className="ub-date">{shortDay(date)}</span>
+                              <span className="ub-name">{sub.name}</span>
+                              <span className="ub-amount">{fmt(sub.cost)}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </section>
+
+                    <div className="subs-table-wrap">
+                      <table className="subs-table">
+                        <caption className="sr-only">
+                          Subscriptions, sorted by {subSort.key === 'next' ? 'next billing date' : subSort.key}. Activate a column heading to change the sort.
+                        </caption>
+                        <thead>
+                          <tr>
+                            {[
+                              ['service', 'Service'],
+                              ['day', 'Billing day'],
+                              ['next', 'Bills in'],
+                              ['account', 'Account / method'],
+                              ['monthly', 'Monthly'],
+                              ['annual', 'Annual']
+                            ].map(([key, label]) => (
+                              <th
+                                key={key}
+                                scope="col"
+                                aria-sort={subSort.key === key ? (subSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                className={`subs-col-${key}`}
+                              >
+                                <button type="button" className="subs-sort" onClick={() => toggleSubSort(key)}>
+                                  {label}
+                                  <span className={`subs-sort-arrow ${subSort.key === key ? `is-${subSort.dir}` : ''}`} aria-hidden="true">
+                                    <ChevronDown size={14} strokeWidth={2.5} />
+                                  </span>
+                                </button>
+                              </th>
+                            ))}
+                            <th scope="col" className="subs-col-actions">
+                              <span className="sr-only">Actions</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {subSorted.map(({ sub, next, days }) => {
+                            const menuOpen = subMenuId === sub.id;
+                            return (
+                              <tr
+                                key={sub.id}
+                                data-row={sub.id}
+                                className={`${sub.paused ? 'is-paused' : ''} ${menuOpen ? 'is-menu-open' : ''}`}
+                              >
+                                <td className="subs-service">
+                                  <span
+                                    className="subs-logo"
+                                    style={{ '--logo-hue': `${logoHue(sub.name)}deg` }}
+                                    aria-hidden="true"
+                                  >
+                                    {serviceInitials(sub.name)}
+                                  </span>
+                                  <span className="subs-service-name">
+                                    {sub.name}
+                                    {sub.paused && <small className="subs-paused-badge">Paused</small>}
+                                  </span>
+                                </td>
+                                <td className="subs-day">{sub.billingDay ? ordinal(sub.billingDay) : '—'}</td>
+                                <td>
+                                  {sub.paused ? (
+                                    <span className="sub-count is-paused">Paused</span>
+                                  ) : next ? (
+                                    <span className={`sub-count ${days <= 3 ? 'is-soon' : ''}`} title={`${shortDay(next)}`}>
+                                      {billInLabel(days)}
+                                    </span>
+                                  ) : (
+                                    <span className="sub-count is-none">No date</span>
+                                  )}
+                                </td>
+                                <td className="subs-account">{accountLabel(sub.accountId) || 'Cash'}</td>
+                                <td className="subs-money">{fmt(sub.cost)}</td>
+                                <td className="subs-money subs-annual">{fmt(Number(sub.cost) * 12)}</td>
+                                <td className="subs-actions">
+                                  <button
+                                    type="button"
+                                    className="subs-actions-btn"
+                                    aria-haspopup="menu"
+                                    aria-expanded={menuOpen}
+                                    aria-label={`Actions for ${sub.name}`}
+                                    onClick={() => setSubMenuId(menuOpen ? null : sub.id)}
+                                  >
+                                    <MoreHorizontal size={18} strokeWidth={2.25} aria-hidden="true" />
+                                  </button>
+                                  {menuOpen && (
+                                    <ul className="subs-menu" role="menu" aria-label={`${sub.name} actions`}>
+                                      <li role="none">
+                                        <button
+                                          type="button"
+                                          role="menuitem"
+                                          onClick={() => {
+                                            setSubMenuId(null);
+                                            setRowEdit({ list: 'subscriptions', id: sub.id });
+                                          }}
+                                        >
+                                          Edit
+                                        </button>
+                                      </li>
+                                      <li role="none">
+                                        <button type="button" role="menuitem" onClick={() => toggleSubPaused(sub)}>
+                                          {sub.paused ? 'Resume' : 'Pause'}
+                                        </button>
+                                      </li>
+                                      <li role="none">
+                                        <button
+                                          type="button"
+                                          role="menuitem"
+                                          className="is-danger"
+                                          onClick={() => {
+                                            setSubMenuId(null);
+                                            removeWithUndo('subscriptions', sub, `Removed ${sub.name}.`);
+                                          }}
+                                        >
+                                          Delete
+                                        </button>
+                                      </li>
+                                    </ul>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {editingSub && (
+                      <form className="row-edit subs-edit-panel" onSubmit={(e) => saveSub(e, editingSub)}>
+                        <p className="subs-edit-title">Edit {editingSub.name}</p>
+                        <label className="field grow">
+                          <span>Service</span>
+                          <input name="name" type="text" defaultValue={editingSub.name} maxLength={NAME_MAX} required onInput={textLock} />
+                        </label>
+                        <label className="field amount">
+                          <span>Per month</span>
+                          <input name="cost" type="text" inputMode="decimal" defaultValue={editingSub.cost} autoComplete="off" required onInput={numericLock} />
+                        </label>
+                        <label className="field day">
+                          <span>Billing day</span>
+                          <input name="billingDay" type="number" inputMode="numeric" min="1" max="31" defaultValue={editingSub.billingDay || ''} placeholder="None" onInput={clearValidity} />
+                        </label>
+                        {accountField(accountOf(editingSub.accountId)?.id, 'Paid from')}
+                        <div className="row-edit-actions">
+                          <button type="submit" className="btn ink">Save</button>
+                          <button type="button" className="btn outline" onClick={() => setRowEdit(null)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </>
+                )}
+              </section>
+            </>
           )}
 
           {view === 'loans' && (
-            <section className="card pad">
+            <>
+            <section className="card pad loans-mobile">
               <div className="card-title-row">
                 <h1>Loans</h1>
                 {data.debts.length === 0 && <p className="card-empty">No loans yet.</p>}
@@ -3930,7 +4454,7 @@ export default function App() {
                       <input type="radio" name="loanFilter" value={value} checked={loanFilter === value} onChange={() => runRowTransition(() => setLoanFilter(value))} />
                       <span>
                         {label}
-                        {value !== 'all' && loanCounts[value] > 0 && <small className="num">{loanCounts[value]}</small>}
+                        <small className="num">{loanCounts[value]}</small>
                       </span>
                     </label>
                   ))}
@@ -3945,30 +4469,11 @@ export default function App() {
                   {shownLoans.map(({ debt, sum }) => {
                     const editingThis = rowEdit?.list === 'debts' && rowEdit.id === debt.id;
                     const left = sum.remaining;
-                    const payments = Array.isArray(debt.payments) ? debt.payments : [];
                     const iOwe = debt.type === 'i_owe';
                     const plan = debt.installment || null;
                     const paidUp = sum.status === 'paid';
                     const panelId = `loan-${debt.id}`;
-                    const dueLabel = (ds) => (ds.slice(0, 4) === todayStr.slice(0, 4) ? shortDay(ds) : `${shortDay(ds)} ${ds.slice(0, 4)}`);
                     const rowsPaid = sum.schedule.filter((r) => r.status === 'paid').length;
-                    const schedAll = !!loanMore[`${debt.id}:sched`];
-                    const payAll = !!loanMore[`${debt.id}:pay`];
-                    const editOpen = !!loanMore[`${debt.id}:edit`];
-                    const firstOpen = sum.schedule.findIndex((r) => r.status !== 'paid');
-                    const schedStart = firstOpen === -1 ? Math.max(0, sum.schedule.length - 4) : Math.max(0, firstOpen - 1);
-                    const schedRows =
-                      schedAll || sum.schedule.length <= 4 ? sum.schedule : sum.schedule.slice(schedStart, schedStart + 4);
-                    const payRows = payAll || payments.length <= 3 ? payments : payments.slice(-3);
-                    const rowNote = (r) =>
-                      r.status === 'paid'
-                        ? 'Paid'
-                        : [
-                            r.status === 'partial' && `${fmt(r.paid)} paid`,
-                            r.due && r.due < todayStr ? 'Overdue' : r.due === todayStr ? 'Due today' : r.status === 'unpaid' && 'Not paid'
-                          ]
-                            .filter(Boolean)
-                            .join(' · ');
                     return (
                       <li key={debt.id} data-row={debt.id} className={`loan-row ${paidUp ? 'is-paid' : ''}`}>
                         <button
@@ -4040,149 +4545,265 @@ export default function App() {
                             </span>
                           </p>
                         </div>
-                        {editingThis && (
-                          <div className="loan-panel" id={panelId}>
-                            {!paidUp && (
-                              <form key={`${left}-${rowEdit.pay ? 'pay' : 'open'}`} className="row-edit pay-form" onSubmit={(e) => recordPayment(e, debt)}>
-                                <label className="field grow">
-                                  <span>{iOwe ? (plan ? 'You paid' : 'You paid back') : `${debt.person} paid back`}</span>
-                                  <input name="paid" type="text" inputMode="decimal" defaultValue={plan ? sum.nextAmount : undefined} placeholder={zeroDecimal ? '0' : '0.00'} autoComplete="off" required autoFocus={!!rowEdit.pay} onInput={numericLock} />
-                                </label>
-                                <label className="field date">
-                                  <span>On</span>
-                                  <input name="date" type="date" defaultValue={todayStr} max={todayStr} />
-                                </label>
-                                <label className="field grow">
-                                  <span>Note</span>
-                                  <input name="note" type="text" placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
-                                </label>
-                                {accountField(accountOf(debt.accountId)?.id, iOwe ? 'Paid from' : 'Paid into')}
-                                <div className="row-edit-actions">
-                                  <button type="submit" className="btn ink">Record payment</button>
-                                  {plan && (
-                                    <button type="button" className="btn outline" onClick={() => settleDebt(debt, left, `Paid off ${debt.person}, ${fmt(left)}.`)}>
-                                      Pay off {fmt(left)}
-                                    </button>
-                                  )}
-                                </div>
-                              </form>
-                            )}
-                            {sum.schedule.length > 0 && (
-                              <>
-                                <h2 className="loan-sub">Schedule</h2>
-                                <ul className="pay-list" aria-label="Installment schedule">
-                                  {schedRows.map((r) => (
-                                    <li key={r.n} className={r.status === 'paid' ? 'is-done' : r.due && r.due < todayStr ? 'is-late' : ''}>
-                                      <span>{r.due ? dueLabel(r.due) : `No. ${r.n}`}</span>
-                                      <span className="pay-note">{rowNote(r)}</span>
-                                      <span className="num">{fmt(r.amount)}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                                {sum.schedule.length > 4 && (
-                                  <button type="button" className="text-btn more-link" onClick={() => toggleMore(`${debt.id}:sched`)}>
-                                    {schedAll ? 'Show fewer' : `Show all ${sum.schedule.length}`}
-                                  </button>
-                                )}
-                              </>
-                            )}
-                            {payments.length > 0 && (
-                              <>
-                                <h2 className="loan-sub">Payments</h2>
-                                <ul className="pay-list" aria-label="Payments so far">
-                                  {payRows.map((p) =>
-                                    payEdit === p.id ? (
-                                      <li key={p.id}>
-                                        <form className="row-edit pay-form" onSubmit={(e) => savePayment(e, debt, p)}>
-                                          <label className="field grow">
-                                            <span>Paid</span>
-                                            <input name="paid" type="text" inputMode="decimal" defaultValue={p.amount} autoComplete="off" required autoFocus onInput={numericLock} />
-                                          </label>
-                                          <label className="field date">
-                                            <span>On</span>
-                                            <input name="date" type="date" defaultValue={p.date || todayStr} max={todayStr} />
-                                          </label>
-                                          <label className="field grow">
-                                            <span>Note</span>
-                                            <input name="note" type="text" defaultValue={p.note || ''} placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
-                                          </label>
-                                          <div className="row-edit-actions">
-                                            <button type="submit" className="btn outline">Save</button>
-                                            <button type="button" className="btn danger" onClick={() => removePayment(debt, p)}>
-                                              Remove
-                                            </button>
-                                            <button type="button" className="btn outline" onClick={() => setPayEdit(null)}>
-                                              Cancel
-                                            </button>
-                                          </div>
-                                        </form>
-                                      </li>
-                                    ) : (
-                                      <li key={p.id}>
-                                        <span>{p.date ? dueLabel(p.date) : 'Paid'}</span>
-                                        <span className="pay-note">{[p.note, accountOf(p.accountId)?.name].filter(Boolean).join(' · ')}</span>
-                                        <span className="num">{fmt(p.amount)}</span>
-                                        <button type="button" className="pay-act" onClick={() => setPayEdit(p.id)} aria-label={`Edit the ${fmt(p.amount)} payment`}>
-                                          Edit
-                                        </button>
-                                      </li>
-                                    )
-                                  )}
-                                </ul>
-                                {payments.length > 3 && (
-                                  <button type="button" className="text-btn more-link" onClick={() => toggleMore(`${debt.id}:pay`)}>
-                                    {payAll ? 'Show fewer' : `Show all ${payments.length}`}
-                                  </button>
-                                )}
-                              </>
-                            )}
-                            <Fold
-                              id={`loan-edit-${debt.id}`}
-                              label="Edit loan details"
-                              className="loan-fold"
-                              open={editOpen}
-                              onToggle={() => toggleMore(`${debt.id}:edit`)}
-                            />
-                            <div className="fold-body" id={`loan-edit-${debt.id}`} hidden={!editOpen}>
-                            <form className="row-edit" onSubmit={(e) => saveDebt(e, debt)}>
-                              <label className="field grow">
-                                <span>{iOwe ? 'Who or what' : 'Who'}</span>
-                                <input name="person" type="text" defaultValue={debt.person} maxLength={NAME_MAX} required onInput={textLock} />
-                              </label>
-                              <label className="field amount">
-                                <span>Total</span>
-                                <input name="amount" type="text" inputMode="decimal" defaultValue={debt.amount} autoComplete="off" required onInput={numericLock} />
-                              </label>
-                              <label className="field grow">
-                                <span>What for</span>
-                                <input name="note" type="text" defaultValue={debt.note || ''} placeholder="Optional" autoComplete="off" maxLength={NOTE_MAX} />
-                              </label>
-                              <label className="field date">
-                                <span>Since</span>
-                                <input name="date" type="date" defaultValue={debt.date || ''} max={todayStr} />
-                              </label>
-                              <PlanFields plan={plan} todayStr={todayStr} optional />
-                              <div className="row-edit-actions">
-                                <button type="submit" className="btn outline">Save</button>
-                                <button type="button" className="btn danger" onClick={() => removeLoan(debt)}>
-                                  Delete loan
-                                </button>
-                              </div>
-                            </form>
-                            </div>
-                            <div className="row-edit-actions loan-close">
-                              <button type="button" className="btn outline" onClick={() => setRowEdit(null)}>
-                                Close
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                        {editingThis && loanPanel(debt, sum)}
                       </li>
                     );
                   })}
                 </ul>
               )}
             </section>
+
+            <div className="loans-desktop">
+              <section className="card pad loans-main">
+                <div className="card-title-row">
+                  <h1>Loans</h1>
+                  {data.debts.length === 0 && <p className="card-empty">No loans yet.</p>}
+                </div>
+                {data.debts.length > 0 && (
+                  <dl className="math loans-math">
+                    <div>
+                      <dt>You owe</dt>
+                      <dd className={owedTotal > 0 ? 'neg' : ''}><Money value={owedTotal} sym={sym} /></dd>
+                    </div>
+                    <div>
+                      <dt>Owed to you</dt>
+                      <dd className="pos"><Money value={owedToMeTotal} sym={sym} /></dd>
+                    </div>
+                  </dl>
+                )}
+                {data.debts.length > 1 && (
+                  <fieldset className="radio-seg loan-filter">
+                    <legend className="sr-only">Show loans</legend>
+                    {[
+                      ['all', 'All'],
+                      ['active', 'Active'],
+                      ['overdue', 'Overdue'],
+                      ['paid', 'Paid']
+                    ].map(([value, label]) => (
+                      <label key={value}>
+                        <input type="radio" name="loanFilterDesktop" value={value} checked={loanFilter === value} onChange={() => setLoanFilter(value)} />
+                        <span>
+                          {label}
+                          <small className="num">{loanCounts[value]}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
+                {data.debts.length === 0 ? null : sortedLoans.length === 0 ? (
+                  <p className="card-empty">No {loanFilter} loans.</p>
+                ) : (
+                  <table className="loan-table">
+                    <caption className="sr-only">Loans</caption>
+                    <colgroup>
+                      <col className="col-loan" />
+                      <col className="col-direction" />
+                      <col className="col-balance" />
+                      <col className="col-progress" />
+                      <col className="col-installments" />
+                      <col className="col-next" />
+                      <col className="col-actions" />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th scope="col">Loan</th>
+                        <th scope="col">Direction</th>
+                        {loanSortHeader('balance', 'Balance')}
+                        {loanSortHeader('progress', 'Progress')}
+                        <th scope="col">Instal&shy;ments</th>
+                        {loanSortHeader('due', 'Next due')}
+                        <th scope="col"><span className="sr-only">Actions</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedLoans.map(({ debt, sum }) => {
+                        const editingThis = rowEdit?.list === 'debts' && rowEdit.id === debt.id;
+                        const left = sum.remaining;
+                        const iOwe = debt.type === 'i_owe';
+                        const plan = debt.installment || null;
+                        const paidUp = sum.status === 'paid';
+                        const rowsPaid = sum.schedule.filter((r) => r.status === 'paid').length;
+                        const pct = Math.round(sum.progress * 100);
+                        const overdue = !paidUp && sum.nextDue && sum.nextDue < todayStr;
+                        const name = loanName(debt);
+                        const counterparty = debt.person && debt.person !== name ? debt.person : null;
+                        const institution = accountLabel(debt.accountId);
+                        const closeMenu = (e) => e.currentTarget.closest('details')?.removeAttribute('open');
+                        return (
+                          <React.Fragment key={debt.id}>
+                            <tr className={`loan-tr ${paidUp ? 'is-paid' : ''}`}>
+                              <th scope="row" className="loan-name-cell">
+                                <button
+                                  type="button"
+                                  className="loan-open"
+                                  aria-expanded={editingThis}
+                                  aria-controls={`loan-${debt.id}`}
+                                  onClick={() => {
+                                    setPayEdit(null);
+                                    setRowEdit(editingThis ? null : { list: 'debts', id: debt.id });
+                                  }}
+                                >
+                                  <span className="loan-name">{name}</span>
+                                  <span className="loan-subline">{[counterparty, institution].filter(Boolean).join(' · ') || '—'}</span>
+                                </button>
+                              </th>
+                              <td><span className={iOwe ? 'neg' : 'pos'}>{iOwe ? 'You owe' : 'Owed to you'}</span></td>
+                              <td className="loan-balance">
+                                <span className="num">{fmt(sum.remaining)}</span>
+                                <small className="muted">of {fmt(debt.amount)}</small>
+                              </td>
+                              <td>
+                                <div className="loan-progress">
+                                  <span
+                                    className="loan-progress-bar"
+                                    role="progressbar"
+                                    aria-label={`${name} paid`}
+                                    aria-valuemin={0}
+                                    aria-valuemax={100}
+                                    aria-valuenow={pct}
+                                  >
+                                    <i style={{ '--pct': pct / 100 }} />
+                                  </span>
+                                  <span className="num loan-progress-pct">{pct}%</span>
+                                </div>
+                              </td>
+                              <td className="num loan-installments">{plan ? `${rowsPaid}/${sum.schedule.length}` : '—'}</td>
+                              <td className={`loan-next ${overdue ? 'is-overdue' : ''}`}>
+                                {paidUp ? (
+                                  <span className="muted">Paid</span>
+                                ) : sum.nextDue ? (
+                                  <>
+                                    <span>{shortDay(sum.nextDue)}</span>
+                                    <small className="num">{fmt(sum.nextAmount)}</small>
+                                  </>
+                                ) : (
+                                  <span className="muted">—</span>
+                                )}
+                              </td>
+                              <td className="loan-row-actions">
+                                {!paidUp && (
+                                  <button
+                                    type="button"
+                                    className="loan-pay"
+                                    onClick={() => {
+                                      setPayEdit(null);
+                                      setRowEdit({ list: 'debts', id: debt.id, pay: true });
+                                    }}
+                                  >
+                                    Pay
+                                  </button>
+                                )}
+                                <details className="loan-menu">
+                                  <summary aria-label={`More actions for ${name}`}>
+                                    <MoreHorizontal size={16} strokeWidth={2.25} aria-hidden="true" />
+                                  </summary>
+                                  <div className="loan-menu-list">
+                                    {!paidUp && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          closeMenu(e);
+                                          setPayEdit(null);
+                                          setRowEdit({ list: 'debts', id: debt.id, pay: true });
+                                        }}
+                                      >
+                                        Record payment
+                                      </button>
+                                    )}
+                                    {!paidUp && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          closeMenu(e);
+                                          settleDebt(
+                                            debt,
+                                            left,
+                                            plan ? `Paid off ${debt.person}, ${fmt(left)}.` : `Settled with ${debt.person}, ${fmt(left)}.`
+                                          );
+                                        }}
+                                      >
+                                        {plan ? `Pay off ${fmt(left)}` : `Settle ${fmt(left)}`}
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        closeMenu(e);
+                                        setPayEdit(null);
+                                        setRowEdit({ list: 'debts', id: debt.id });
+                                      }}
+                                    >
+                                      Details and schedule
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="is-danger"
+                                      onClick={(e) => {
+                                        closeMenu(e);
+                                        removeLoan(debt);
+                                      }}
+                                    >
+                                      Delete loan
+                                    </button>
+                                  </div>
+                                </details>
+                              </td>
+                            </tr>
+                            {editingThis && (
+                              <tr className="loan-detail">
+                                <td colSpan={7}>{loanPanel(debt, sum)}</td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+
+              <aside className="card pad loans-side" aria-labelledby="next-payments-heading">
+                <h2 id="next-payments-heading">Next payments</h2>
+                {upcomingDues.length > 0 ? (
+                  <ul className="due-list">
+                    {upcomingDues.map((d, i) => (
+                      <li key={`${d.id}-${d.due}-${i}`} className={d.due < todayStr ? 'is-overdue' : ''}>
+                        <span className="due-date">{shortDay(d.due)}</span>
+                        <span className="due-name">{d.name}</span>
+                        <span className="num due-amount">{fmt(d.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted loans-side-empty">No payments scheduled.</p>
+                )}
+                <p className="due-total">
+                  <Money value={duesThisMonth} sym={sym} />
+                  <span>due this month</span>
+                </p>
+                <div className="payoff">
+                  <div className="payoff-head">
+                    <h3>Payoff progress</h3>
+                    <span className="num">{loanPayoffPct}%</span>
+                  </div>
+                  <span
+                    className="loan-progress-bar"
+                    role="progressbar"
+                    aria-label="Payoff progress across active loans"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={loanPayoffPct}
+                  >
+                    <i style={{ '--pct': loanPayoffPct / 100 }} />
+                  </span>
+                  <p className="muted">
+                    {fmt(loanAggregate.paid)} of {fmt(loanAggregate.total)} across {activeLoans.length}{' '}
+                    {activeLoans.length === 1 ? 'active loan' : 'active loans'}.
+                  </p>
+                </div>
+              </aside>
+            </div>
+            </>
           )}
 
           {view === 'accounts' && (

@@ -218,6 +218,22 @@ export const dueBillingDates = (sub, todayStr) => {
   return out;
 };
 
+// The next time this subscription bills on or after today. Mirrors the
+// month-end clamping used by dueBillingDates, so the 31st bills on the 30th
+// in a short month and the countdown matches the amount actually charged.
+export const nextBillDate = (sub, todayStr) => {
+  const day = Math.round(Number(sub.billingDay));
+  if (!(day >= 1 && day <= 31) || sub.paused) return null;
+  const today = parseDate(todayStr);
+  const onMonth = (y, m) => toDateStr(new Date(y, m, Math.min(day, daysInMonth(y, m))));
+  let ds = onMonth(today.getFullYear(), today.getMonth());
+  if (ds < todayStr) {
+    const next = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    ds = onMonth(next.getFullYear(), next.getMonth());
+  }
+  return ds;
+};
+
 export const paidBeforeTracking = (sub, period) => {
   if (!sub.existing || !isDateStr(sub.since)) return false;
   const day = Math.round(Number(sub.billingDay));
@@ -235,7 +251,7 @@ export const computeMonthlyCash = ({ expenses, income, transfers = [], subscript
   const spent = cashExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   const earned = income.filter((e) => inPeriod(e) && isCash(e)).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   const moved = transfers.filter(inPeriod).reduce((sum, t) => sum + cashDelta(t), 0);
-  const pending = subscriptions.filter(isCash).reduce((sum, sub) => {
+  const pending = subscriptions.filter((sub) => !sub.paused && isCash(sub)).reduce((sum, sub) => {
     const logged = paidBeforeTracking(sub, period) || cashExpenses.some((e) => e.subId === sub.id);
     return sum + (logged ? 0 : Number(sub.cost || 0));
   }, 0);
