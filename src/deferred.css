@@ -792,6 +792,94 @@
     font-weight: 500;
   }
 
+  @media (width >= 1000px) {
+    .accounts-stats {
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .accounts-stats.single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .accounts-stats .stat-total {
+      grid-column: auto;
+      padding: 0 var(--space-5) 0 0;
+      border-bottom: 0;
+    }
+
+    .accounts-stats > div + div {
+      padding-inline-start: var(--space-5);
+      border-inline-start: 1.5px solid var(--panel-line);
+    }
+
+    .accounts-stats .stat-total dd {
+      font-size: clamp(1.75rem, 3vw, 2.25rem);
+    }
+
+    .accounts-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) 7rem 9rem minmax(0, 1fr) 2.5rem;
+      gap: var(--space-4);
+      align-items: center;
+      padding: var(--space-2) var(--space-3);
+      border-bottom: 1.5px solid var(--panel-line);
+      color: var(--text-3);
+      font-size: var(--text-label);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .accounts-head > :nth-child(3) {
+      text-align: end;
+    }
+
+    .account-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) 7rem 9rem minmax(0, 1fr) 2.5rem;
+      gap: var(--space-4);
+      align-items: center;
+      min-height: 4rem;
+      padding: var(--space-1) var(--space-3);
+      border-top: 0;
+      border-bottom: 1px solid var(--panel-line);
+      transition: background-color var(--dur-ui) ease;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .account-row:hover {
+        background: var(--wash-3);
+      }
+    }
+
+    .account-row:last-child {
+      border-bottom: 0;
+    }
+
+    .account-row:has(.account-edit) {
+      display: block;
+      padding-block: var(--space-2);
+    }
+
+    .acct-inst {
+      flex: none;
+    }
+
+    .acct-balance {
+      margin-inline-start: 0;
+      justify-self: end;
+      font-size: var(--text-body-lg);
+    }
+
+    .acct-share {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+  }
+
   .card-list > li:has(.row-edit),
   .card-list li.loan-row,
   .card-list li.goal-row,
@@ -1226,10 +1314,6 @@
     .well .date-stamp {
       top: 2.375rem;
       font-size: var(--text-ui);
-    }
-
-    .accounts-math > div:nth-child(2) {
-      padding-inline-start: 0;
     }
 
     .bottom-nav {

@@ -842,6 +842,7 @@ export default function App() {
   }, []);
   const [catMove, setCatMove] = useState(null);
   const [rowEdit, setRowEdit] = useState(null);
+  const [acctMenu, setAcctMenu] = useState(null);
   const [loanFilter, setLoanFilter] = useState('all');
   const [loanSort, setLoanSort] = useState({ key: 'due', dir: 'asc' });
   const [subSort, setSubSort] = useState({ key: 'next', dir: 'asc' });
@@ -1203,6 +1204,10 @@ export default function App() {
   );
   const balanceOf = (acc) => balances.get(acc.id) ?? 0;
   const sumBalances = (type) => round2(accounts.reduce((s, a) => s + (type && a.type !== type ? 0 : balanceOf(a)), 0));
+  const overdraftAccounts = accounts.filter((a) => balanceOf(a) < 0);
+  const deficitTotal = round2(overdraftAccounts.reduce((s, a) => s + balanceOf(a), 0));
+  const beforeDeficit = round2(sumBalances() - deficitTotal);
+  const grossBalances = round2(accounts.reduce((s, a) => s + Math.abs(balanceOf(a)), 0));
   const defaultAccountId =
     data.prefs.lastAccount === 'none' ? null : (accountOf(data.prefs.lastAccount) || accounts[0])?.id ?? null;
   const readAccountId = (control) => {
@@ -3327,7 +3332,7 @@ export default function App() {
   })();
   const TRANSFERS_SHOWN = 5;
   const accountSplit =
-    accounts.length > 2 && accounts.some((a) => a.type === 'ewallet') && accounts.some((a) => a.type !== 'ewallet');
+    accounts.length > 1 && accounts.some((a) => a.type === 'ewallet') && accounts.some((a) => a.type !== 'ewallet');
   const fabTarget = ADD_FORMS[view];
 
   const fab = fabTarget ? (
@@ -4807,41 +4812,68 @@ export default function App() {
           )}
 
           {view === 'accounts' && (
-            <section className="card pad">
+            <section className="card pad accounts-card">
               <div className="card-title-row">
                 <h1>Accounts</h1>
-                {!hasAccounts && <p className="card-empty">No accounts yet.</p>}
+                {!hasAccounts && <p className="card-empty">No accounts yet. Add one to start tracking balances.</p>}
               </div>
               {accounts.length > 1 && (
-<dl className="math accounts-math">
-                <div>
-                  <dt>Total balance</dt>
-                  <dd className={sumBalances() < 0 ? 'neg' : 'pos'}><Money value={sumBalances()} sym={sym} /></dd>
-                </div>
-{accountSplit && (
-<>
-                <div>
-                  <dt>Bank</dt>
-                  <dd className={sumBalances('bank') < 0 ? 'neg' : ''}><Money value={sumBalances('bank')} sym={sym} /></dd>
-                </div>
-                <div>
-                  <dt>E-wallet</dt>
-                  <dd className={sumBalances('ewallet') < 0 ? 'neg' : ''}><Money value={sumBalances('ewallet')} sym={sym} /></dd>
-                </div>
-</>
-)}
-              </dl>
-)}
+                <dl className={`accounts-stats ${accountSplit ? '' : 'single'}`}>
+                  <div className="stat-total">
+                    <dt>Total balance</dt>
+                    <dd className={sumBalances() < 0 ? 'neg' : 'pos'}><Money value={sumBalances()} sym={sym} /></dd>
+                    {overdraftAccounts.length > 0 && (
+                      <p className="accounts-deficit-note">
+                        Net of {overdraftAccounts.length === 1 ? `${overdraftAccounts[0].name} deficit` : 'overdrawn accounts'}:
+                        {' '}<span className="num">{fmt(beforeDeficit)}</span>
+                      </p>
+                    )}
+                  </div>
+                  {accountSplit && (
+                    <>
+                      <div>
+                        <dt>Bank</dt>
+                        <dd className={sumBalances('bank') < 0 ? 'neg' : ''}><Money value={sumBalances('bank')} sym={sym} /></dd>
+                      </div>
+                      <div>
+                        <dt>E-wallet</dt>
+                        {sumBalances('ewallet') < 0 ? (
+                          <dd className="stat-overdrawn">
+                            <TriangleAlert size={15} strokeWidth={2.25} aria-hidden="true" />
+                            Overdrawn
+                          </dd>
+                        ) : (
+                          <dd><Money value={sumBalances('ewallet')} sym={sym} /></dd>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </dl>
+              )}
               {hasAccounts && (
-                <ul className="card-list">
+                <div className="accounts-table" role="table" aria-label="Accounts">
+                  <div className="accounts-head" role="row">
+                    <span role="columnheader">Institution</span>
+                    <span role="columnheader">Type</span>
+                    <span role="columnheader">Balance</span>
+                    <span role="columnheader">Share of total</span>
+                    <span role="columnheader" className="sr-only">Actions</span>
+                  </div>
+                  <ul className="account-rows" role="rowgroup">
                   {accounts.map((acc) => {
                     const editingThis = rowEdit?.list === 'accounts' && rowEdit.id === acc.id;
                     const live = balanceOf(acc);
                     const editPresets = ACCOUNT_PRESETS[editAccountType] || ACCOUNT_PRESETS.bank;
+                    const share = grossBalances > 0 ? (Math.abs(live) / grossBalances) * 100 : 0;
                     return (
-                      <li key={acc.id} data-row={acc.id}>
+                      <li
+                        key={acc.id}
+                        data-row={acc.id}
+                        role="row"
+                        className={`account-row ${live < 0 ? 'is-overdraft' : ''}`}
+                      >
                         {editingThis ? (
-                          <form className="row-edit" onSubmit={(e) => saveAccount(e, acc)}>
+                          <form className="row-edit account-edit" onSubmit={(e) => saveAccount(e, acc)}>
                             <fieldset className="radio-seg grow-full">
                               <legend className="sr-only">Kind of account</legend>
                               {ACCOUNT_TYPES.map(([value, label]) => (
@@ -4919,36 +4951,120 @@ export default function App() {
                           </form>
                         ) : (
                           <>
-                            <button
-                              type="button"
-                              className="row-open"
-                              onClick={() => startEditAccount(acc)}
-                              aria-label={`Edit ${acc.name}, ${accountTypeLabel(acc.type)}, balance ${fmt(live)}`}
+                            <div className="acct-inst" role="cell">
+                              <span className="acct-name">{acc.name}</span>
+                            </div>
+                            <span
+                              className={`type-pill ${acc.type === 'ewallet' ? 'wallet' : 'bank'}`}
+                              role="cell"
                             >
-                              <span className="grow">
-                                {acc.name}
-                                <small className="muted">{accountTypeLabel(acc.type)}</small>
+                              {accountTypeLabel(acc.type)}
+                            </span>
+                            <span className={`acct-balance ${live < 0 ? 'neg' : ''}`} role="cell">
+                              {live < 0 && (
+                                <span
+                                  className="overdraft-flag"
+                                  tabIndex={0}
+                                  aria-describedby={`od-${acc.id}`}
+                                  aria-label={`${acc.name} is overdrawn`}
+                                >
+                                  <TriangleAlert size={16} strokeWidth={2.25} aria-hidden="true" />
+                                  <span className="overdraft-pop" id={`od-${acc.id}`} role="tooltip">
+                                    {acc.name} is below zero. Transfer money in to clear it.
+                                  </span>
+                                </span>
+                              )}
+                              <Money value={live} sym={sym} />
+                            </span>
+                            <div className="acct-share" role="cell">
+                              <span className="acct-share-track" aria-hidden="true" style={{ '--share': share / 100 }}>
+                                <i />
                               </span>
-                              <span className={`num ${live < 0 ? 'neg' : ''}`}>{fmt(live)}</span>
-                            </button>
-                            <button className="row-del" onClick={() => removeAccount(acc)} aria-label={`Remove ${acc.name}`}>
-                              <X size={16} strokeWidth={2.25} aria-hidden="true" />
-                            </button>
+                              <span className="acct-share-pct">{Math.round(share)}%</span>
+                            </div>
+                            <div
+                              className={`acct-actions ${acctMenu === acc.id ? 'is-open' : ''}`}
+                              role="cell"
+                              onPointerLeave={() => setAcctMenu((open) => (open === acc.id ? null : open))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') setAcctMenu(null);
+                              }}
+                            >
+                              <button
+                                type="button"
+                                className="acct-actions-btn"
+                                aria-label={`Actions for ${acc.name}`}
+                                aria-haspopup="menu"
+                                aria-expanded={acctMenu === acc.id}
+                                onClick={() => setAcctMenu((open) => (open === acc.id ? null : acc.id))}
+                              >
+                                <MoreHorizontal size={18} strokeWidth={2.25} aria-hidden="true" />
+                              </button>
+                              <div className="acct-menu" role="menu" aria-label={`Actions for ${acc.name}`}>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => {
+                                    setAcctMenu(null);
+                                    openAddSheet('transfer');
+                                  }}
+                                >
+                                  <ArrowLeftRight size={15} strokeWidth={2} aria-hidden="true" />
+                                  Transfer
+                                </button>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => {
+                                    setAcctMenu(null);
+                                    startEditAccount(acc);
+                                  }}
+                                >
+                                  Edit account
+                                </button>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="danger"
+                                  onClick={() => {
+                                    setAcctMenu(null);
+                                    removeAccount(acc);
+                                  }}
+                                >
+                                  Delete account
+                                </button>
+                              </div>
+                            </div>
                           </>
                         )}
                       </li>
                     );
                   })}
-                </ul>
+                  </ul>
+                </div>
               )}
               <div className="transfers">
                 <div className="card-title-row">
                   <h2>Transfers</h2>
-                  {(!hasAccounts || transfersByWhen.length === 0) && (
-                    <p className="card-empty">{hasAccounts ? 'No transfers yet.' : 'No accounts yet.'}</p>
-                  )}
                 </div>
-                {transfersByWhen.length > 0 && (
+                {transfersByWhen.length === 0 ? (
+                  <div className="empty-state">
+                    <span className="empty-state-icon" aria-hidden="true">
+                      <ArrowLeftRight size={20} strokeWidth={2} />
+                    </span>
+                    <div className="empty-state-copy">
+                      <strong>No transfers yet</strong>
+                      <p>Move money between your accounts without counting it as spending.</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn ink"
+                      onClick={() => openAddSheet(hasAccounts ? 'transfer' : 'account')}
+                    >
+                      Make your first transfer
+                    </button>
+                  </div>
+                ) : (
                   <ul className="card-list">
                         {(transfersAll ? transfersByWhen : transfersByWhen.slice(0, TRANSFERS_SHOWN)).map((t) => {
                           const from = transferSide(t.fromId);
@@ -5017,15 +5133,13 @@ export default function App() {
               <div className="goals">
                 <div className="card-title-row">
                   <h2>Savings goals</h2>
-                  {data.goals.length === 0 ? (
-                    <p className="card-empty">No savings goals yet.</p>
-                  ) : (
+                  {data.goals.length > 0 && (
                     <span className="num muted">
                       {fmt(round2(data.goals.reduce((sum, g) => sum + goalProgress(g).saved, 0)))} set aside
                     </span>
                   )}
                 </div>
-                {data.goals.length > 0 && (
+                {data.goals.length > 0 ? (
                   <ul className="card-list">
                     {data.goals.map((goal) => {
                       const progress = goalProgress(goal);
@@ -5145,6 +5259,19 @@ export default function App() {
                       );
                     })}
                   </ul>
+                ) : (
+                  <div className="empty-state">
+                    <span className="empty-state-icon" aria-hidden="true">
+                      <PiggyBank size={20} strokeWidth={2} />
+                    </span>
+                    <div className="empty-state-copy">
+                      <strong>No savings goals yet</strong>
+                      <p>Set money aside for something you are saving toward.</p>
+                    </div>
+                    <button type="button" className="btn ink" onClick={() => openAddSheet('goal')}>
+                      Create a savings goal
+                    </button>
+                  </div>
                 )}
                 {data.goals.length > 0 && (
                   <p className="hint">
