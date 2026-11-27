@@ -326,8 +326,8 @@
       0 8px 16px -4px oklch(0% 0 0deg / 25%),
       0 24px 48px -12px var(--shadow-color-35);
     --shadow-press: 0 1px 2px oklch(0% 0 0deg / 30%), 0 3px 8px -2px oklch(0% 0 0deg / 25%);
-    --font-ui: 'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-stamp: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+    --font-ui: 'Bricolage Grotesque Variable', 'Bricolage Fallback', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-stamp: 'Bricolage Grotesque Variable', 'Bricolage Fallback', system-ui, sans-serif;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in: cubic-bezier(0.4, 0, 1, 1);
     --ease-standard: cubic-bezier(0.2, 0, 0, 1);
@@ -1373,6 +1373,17 @@
 
   .list {
     list-style: none;
+  }
+
+  /* Spacers that stand in for the rows a windowed list has not mounted. */
+  .list > .vpad {
+    padding: 0;
+    border: 0;
+    list-style: none;
+  }
+
+  .vpad + .history-day {
+    border-top: 0;
   }
 
   .list-row {

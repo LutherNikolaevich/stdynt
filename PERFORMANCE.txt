@@ -1,0 +1,394 @@
+# Performance
+
+Markdown, named `.txt` because `.gitignore` ignores `*.md` and `docs/`.
+
+Every number below comes from this repo's own build on 2026-11-27, measured with
+`npm run audit` (Chromium, 390x844, 4x CPU slowdown, slow 4G, first visit). It is
+a reproducible baseline, not a third-party score.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `npm run build` | Production build (inlined critical CSS, deferred sheet, precompressed, source maps) |
+| `npm run audit` | Serves `dist/` in a real browser and reports paint metrics, CLS, the worst interaction (INP), DOM size, the request chain, third-party requests, render-blocking tags and back/forward cache restore. It taps the real controls a first visitor meets to measure INP, and exits non-zero when FCP passes 1.8s, LCP 2.5s, CLS 0.1, INP 200ms or the full load 3s, or on any other regression. `--url https://...` audits a deployment instead. |
+| `npm run wpt` | Submits a WebPageTest run (needs `WPT_API_KEY` and `WPT_URL`, optional `WPT_LOCATION`, `WPT_RUNS`) and prints the median run. |
+| `npm run font-metrics -- <file.woff2>` | Reports a font's axes and raw metrics; derives the fallback overrides. |
+
+## Baseline
+
+```
+TTFB                     157 ms   (150 ms of that is the simulated RTT)
+First Contentful Paint   1260 ms
+Largest Contentful Paint 1412 ms   (div.sheet-foot — the first-run setup sheet)
+Cumulative Layout Shift  0
+Interaction to Next Paint 104 ms   (worst of 7 real taps)
+DOMContentLoaded          965 ms
+Load                      972 ms
+DOM nodes                200 (depth 12)
+DOM per route            today 200 · categories 188 · subs 203 · loans 220 · accounts 219 · settings 335
+Requests                 5 (110 KB encoded)
+Render-blocking tags     none
+Third-party requests     none
+
+request chain
+  Document   10 KB (br)
+  Script     93 KB (br)  assets/index-*.js   — the entry module, deferred
+  Stylesheet  6 KB (br)  assets/deferred-*.css — media="print", preload low
+  Font       78 KB       latin woff2, preload low
+```
+
+Depth is 2: the document, then everything else in parallel. The entry script is
+the only resource the first paint waits on, and it is a module script, so the
+parser never blocks on it.
+
+All five budgets are met with room: FCP has 540 ms of headroom under 1.8s, LCP
+1090 ms under 2.5s, CLS is 0, INP 104 ms against 200 ms, and the full load is
+972 ms against 3s. The first load in a cold browser is the slow case (it can
+add a second ~200 ms main-thread task while V8 compiles the entry), which is
+what the audit measures; warm reloads land near 1000 ms FCP.
+
+## 1. WebPageTest analysis
+
+`scripts/wpt.mjs` runs three Moto G4 / 4G passes with video and the Lighthouse
+pass, waits for the result, and prints the median. It is manual because the free
+API key is rate-limited; there is no key in this environment, so **no live
+WebPageTest run was made here** — the browser audit above is the local
+evidence, and the script reproduces the same measurements on a real handset
+profile once a key is added.
+
+What to read in the result: the waterfall's first entry (the document) and the
+second (the entry script) should be the only long bars before Start Render;
+anything on another host before consent is a regression.
+
+## 2. Google Consent Mode v2
+
+`src/consent.js`, `src/ConsentBanner.jsx`.
+
+- Configured by `VITE_GA_ID`. With no ID the module is a no-op: no banner, no
+  dataLayer, no script, and the CSP keeps Google out entirely.
+- Default state is declared before the tag can exist, and it is denied:
+  `ad_storage`, `ad_user_data`, `ad_personalization` and `analytics_storage`
+  are all `denied`; only `functionality_storage` and `security_storage` are
+  granted. On a grant, `consent`/`update` flips `analytics_storage`; the three
+  ad signals stay denied because stdynt runs no advertising tags.
+- The Google tag is loaded only after a grant (basic consent mode), so the
+  "nothing leaves this device" promise holds until the visitor says yes. On a
+  grant the preconnects to `googletagmanager.com` and `google-analytics.com`
+  are added, then the async `gtag/js` script, then one `config` call.
+- The answer is stored in `stdynt_consent_v1` and can be changed any time from
+  the Privacy card in Settings.
+- `vite.config.js` adds Google's origins to `script-src`, `img-src` and
+  `connect-src` **only when `VITE_GA_ID` is set**.
+- Verified in a browser with a test ID, 15 checks: no Google request before a
+  choice, decline sends nothing (and stays that way on reload), accept loads the
+  tag once, `consent default` precedes the tag, `consent update` carries
+  `analytics_storage: granted`, ad signals stay denied, and the Privacy card is
+  reachable.
+- Note: the first-run intro sheet is a modal `<dialog>`, which sits in the top
+  layer and covers the banner until it closes.
+
+## 3. Critical request chains
+
+Already minimised by the build, and now measured:
+
+- Critical CSS is inlined into the document (46 KB raw, inside a 10 KB br HTML),
+  so the first paint needs no stylesheet request.
+- Everything else is one sheet linked `media="print"`, preloaded at a low
+  priority, and switched to `all` by `src/main.jsx` after mount.
+- The entry is a module script with `fetchpriority="high"`; the liquid-well
+  canvas stays a lazy chunk started at idle; below-fold sections mount on
+  intersection.
+- Depth 2, one render-blocking resource avoided, no third-party origins.
+- Change made: the font preload moved from `fetchpriority="high"` to `low`. The
+  first paint waits on the script, not the font; at high priority the 78 KB font
+  competed with the 93 KB script for a slow connection. The fallback face below
+  makes the later swap invisible to layout.
+
+## 4. Web font loading
+
+- One self-hosted variable woff2 (78 KB latin, 31.9 KB latin-ext behind
+  `unicode-range`), `format('woff2-variations')`, `font-display: swap`, and the
+  latin file preloaded. The `-wdth-` file is the smallest one that carries both
+  axes the design uses (weight 200–800 and width 75–100%; the weight-only file
+  is 41 KB but has no width axis, and the all-axes file is 131 KB).
+- Change made: a metric-matched `Bricolage Fallback` face (local Arial/Helvetica)
+  with `size-adjust` and ascent/descent/line-gap overrides, so text that wraps
+  while the woff2 is still arriving wraps in the same place when it swaps in.
+  The ascent and descent come from the font's hhea table (930/270 at 1000 units).
+  The width ratio had to be measured in the browser: the font's stored
+  `xAvgCharWidth` implies 124%, but real rendered text needs **107.02%**
+  (measured across 8 sample strings at weights 400 and 700; after the fix the
+  fallback is within 1–4% of the webfont per string). `scripts/font-metrics.mjs`
+  prints the raw metrics and documents the caveat.
+- Measured: CLS 0 both with and without the fallback face at today's screens, so
+  the change is not claimed as a CLS win — it removes the reflow risk for the
+  wrapped text on text-heavy screens and keeps the fallback from looking 17% too
+  wide, which is what it did at the wrong ratio.
+
+## 5. HTTP/2 and HTTP/3
+
+Nothing in this repo selects a protocol, which is correct: the app is static
+files on Vercel, and Vercel serves HTTP/2 by default and HTTP/3 (QUIC, via
+`alt-svc`) to browsers that support it. `vercel.json` sets only cache headers —
+no redirects, no rewrites, nothing that downgrades the connection.
+
+Verify after deploying:
+
+```
+curl -sI --http2  https://<deploy>/ | head -1     # HTTP/2 200
+curl -sI --http3  https://<deploy>/ | head -1     # HTTP/3 200 (curl with HTTP/3)
+curl -sI https://<deploy>/ | grep -i alt-svc      # h3=":443"
+```
+
+The build also removes the multiplexing pressure protocols help with: 4 requests
+on a cold load, one of them render-critical. Assets are immutable-cached for a
+year (`/assets/(.*)`), so repeat visits make no requests at all once the service
+worker has the build.
+
+## 6. Animated GIFs to video
+
+None in the repo (`find . -iname '*.gif'` is empty; every image is PNG). Nothing
+to convert. If an animation is added, ship it as `<video autoplay muted loop
+playsinline>` with WebM + MP4 and a still `poster`, not a GIF.
+
+## 7. Browser-based audits
+
+`npm run audit` is the full-browser audit: Chromium, phone viewport, 4x CPU
+throttle, slow 4G, service worker blocked so the network is the whole story. It
+collects FCP/LCP/CLS from `PerformanceObserver` (with each shift's source node),
+TTFB and load from the navigation timing entry, DOM node count and depth, the
+request chain with encoded bytes, and every third-party request. It also taps
+the first-run controls and reads Event Timing, so INP is measured rather than
+assumed (section 20). It fails the run when FCP/LCP/CLS/INP or the full load is
+over the budget in the Baseline section, when INP could not be measured, when
+anything is third-party, when the markup has a render-blocking tag, or on a
+back/forward cache regression.
+
+Current result: `audit: OK`. CLS is 0 with no shifts recorded, FCP 1260 ms, LCP
+1412 ms, INP 104 ms and a 972 ms load.
+
+## 8. DOM size and complexity
+
+Measured 200 nodes on Today (depth 12) and 335 on the heaviest screen,
+Settings. That is small, and the structure is already lazy in the right way:
+one view is mounted at a time, below-fold sections wait for an intersection,
+history pages 10 days / 20 rows at a time, the well canvas is a separate idle
+chunk. The history list also windows its rows (section 18), so its node count no
+longer grows with the data. The audit prints the per-route count so growth is
+visible.
+
+## 9. Duplicate JavaScript libraries
+
+`npm ls react react-dom lucide-react` shows one React (19.3.1) with every
+consumer deduped, and one icon library. The bundle has a single React and no
+polyfilled duplicate; `lucide-react` is imported per icon, so Vite tree-shakes
+it down to the icons used.
+
+## 10. Google Tag Manager impact
+
+There is no GTM container, which is the efficient choice: GTM would add a second
+render path and a second script for no benefit. The implementation is one async
+`gtag/js` load, one `config` call, and nothing else — and it happens only after
+analytics consent, so the default build has zero tag third-party cost. The CSP
+is tightened to Google's exact origins, and connections to them are warmed with
+`preconnect` at the moment of consent rather than at page load.
+
+## 11. Secure and up-to-date libraries
+
+`npm audit` and `npm audit --omit=dev` both report **0 vulnerabilities**. Runtime
+dependencies are current majors: React 19.3.1, Vite 8.3.8, lucide-react 1.72.0.
+The dev-only addition this change made is `playwright` (the browser audit).
+
+## 12. JavaScript-based redirects
+
+None. Routing is hash-based (`#/today`, `#/settings`), there is no
+`location.assign`, `location.replace` or meta refresh anywhere in `src/`,
+`public/` or `index.html`, and `vercel.json` declares no redirects. The only
+navigations are `history.back()`, `location.reload()` after an update, and hash
+changes.
+
+## 13. Legacy JavaScript to modern browsers
+
+The build emits modern syntax only: no `regeneratorRuntime`, no `core-js` in any
+chunk, and the output contains `??` and `?.` natively. Vite 8 targets
+baseline-widely-available browsers, and there is no `@vitejs/plugin-legacy` or
+Babel pass, so modern browsers get no ES5 downlevel.
+
+## 14. Render-blocking resources
+
+Measured from the built HTML: **0 render-blocking tags**. The critical CSS is
+inline, the deferred sheet is `media="print"` (fetched without blocking, applied
+after mount), and the entry is a module script with `fetchpriority="high"`
+(module scripts are deferred). The `<noscript>` copy of the stylesheet is the
+only blocking tag in the file and only exists when JavaScript is off, so the
+audit strips it before counting.
+
+## 15. Source maps in production
+
+`build.sourcemap: 'hidden'` writes `.map` files next to the assets with no
+`sourceMappingURL` comment, so browsers never fetch them and visitors do not pay
+for them, while error trackers can upload them by URL. Maps are excluded from
+the service worker precache (the build skips `*.map`), so offline installs do not
+carry them.
+
+Two things to know: the maps are still present in the deployed `dist/`, so the
+sources are readable by anyone who guesses the URL (drop `sourcemap` to `false`,
+or keep the maps out of the deploy and upload them in CI, if that matters); and
+they add ~1.5 MB to `dist/` on disk, not to any visitor's download.
+
+## 16. Time to First Byte
+
+The HTML is a static file (10 KB br, including the inlined critical CSS) with
+`Cache-Control: public, max-age=0, must-revalidate` on `/` and `index.html`, and
+the service worker serves it from cache after the first visit, so there is no
+server work on the path. TTFB in the audit (154 ms, of which 150 ms is the
+artificial RTT) measures the local server, not the CDN, so treat it as a
+sanity check rather than a number. `npm run wpt` reports the real TTFB from
+WebPageTest's location, which is the number to act on.
+
+## 17. Back/forward cache
+
+A page restored from the back/forward cache paints instantly and keeps its
+React state, so the browser must be allowed to keep it and the app must put
+back what the browser does not.
+
+- **No blockers.** `src/` declares no `unload` or `beforeunload` listener, and
+  the document is served with `max-age=0, must-revalidate` rather than
+  `no-store`, which would also disqualify it. The service worker does not opt
+  the page out; Chromium admits it, measured below.
+- **State on resume.** React state, open sheets, folds and form contents are
+  the live DOM, so they survive untouched. `App` already resyncs `todayStr` on
+  `pageshow` and `focus` (so a page resumed at midnight shows the new day), and
+  every change is written to `localStorage` as it happens, so nothing depends
+  on a save-at-unload hook.
+- **Change made: scroll position.** In-app view switches set
+  `history.scrollRestoration = 'manual'`, which also turns off the browser's
+  scroll restore for a cached page: leaving at 400px came back at 0. The
+  routing effect now saves the offset on `pagehide` and restores it on
+  `pageshow` when `event.persisted`, so the trip back lands where the visitor
+  left. Measured before the fix: `scrollY 0`; after: 400, asserted by the
+  audit within 2px.
+- **Change made: no reload while hidden.** The service-worker update path
+  called `window.location.reload()` on `visibilitychange` to hidden, which
+  navigates the page away just as it is being cached. The reload now waits for
+  the page to be visible again; a hidden page is left alone for the browser to
+  freeze.
+- **Measured** by `npm run audit`: it navigates away to a second document and
+  comes back with `page.goBack()`, then reads the navigation timing entry. It
+  requires `type === 'back_forward'` with `notRestoredReasons === null` (a null
+  list is what Chromium reports when the page was restored) and the scroll
+  offset intact. A test-only init script wraps `addEventListener` and records
+  any `unload`/`beforeunload` registration, so a future one fails the run.
+  Current result: `Back/forward cache restored`, `unload listeners none`.
+- **Not covered:** Chrome is the only engine measured. Safari has its own
+  eviction rules (and a long-lived page may be evicted under memory pressure),
+  so the restore path is written to be a no-op when `event.persisted` is false
+  rather than relied on for correctness.
+
+## 18. Virtualized long lists and tables
+
+The only collection that could grow without bound is history: it renders every
+entry the visitor owns, and "Show more" used to leave every earlier page mounted.
+Both of its lists (by date, and recently added) now render only the rows in or
+near the viewport, with two empty `<li>` spacers standing in for the rest.
+
+- `useWindowedRows` in `src/perf.jsx`: a prefix sum of measured row heights (48px
+  estimate until a row is seen), a binary search for the first and last visible
+  row on scroll, 900px of overscan above and below, and a `requestAnimationFrame`
+  scroll handler that only re-renders when the range actually changes. Row heights
+  are measured after layout (days can be expanded, so they are not constant) and
+  a row that reports a new height bumps the prefix sums.
+- The spacers keep the document height and therefore the native scrollbar, the
+  scroll position and the browser's own scrolling untouched: the page still
+  scrolls as one surface, there is no inner scroll container and no absolute
+  positioning, so find-on-page for on-screen text, focus and the back/forward
+  scroll restore behave as before.
+- Measured in Chromium at 390x844 with a history of 400 entries seeded into
+  `localStorage` and every page expanded, counting
+  `document.querySelectorAll('.list > li[data-vindex]')`: **51 rows in the DOM**
+  at peak (923 elements in the document), against
+  all 400 rows before the change. The document stayed 22,155px tall through
+  scrolls to the middle and the bottom, height drift was 0px, scrolling back to
+  2200 landed at 2200 both times, and the console stayed clean.
+- Day mode with 60 days / 400 entries: 51 of 60 day rows mounted at peak, 1px
+  height drift from measurement rounding, same scroll behaviour.
+- Tradeoff, deliberately taken: off-screen rows are not in the document, so
+  browser find (Ctrl+F) and a screen reader's virtual cursor only reach what is
+  mounted. "Show more" still controls how much data is in the list; windowing
+  only controls how much of it is in the DOM.
+- There are no `<table>` elements in the app, so nothing else needed it. The
+  other lists (subs, loans, accounts, categories) are bounded by user input at a
+  few dozen rows and were left alone.
+
+## 19. Streaming HTML before the response is ready
+
+Not applicable to this build, and not faked:
+
+- `index.html` is a static file with no server render. It is a fixed 10 KB
+  document — inline critical CSS plus `<div id="root">` — served by the CDN with
+  no application server in the path, so there is no HTML to produce
+  incrementally and no first-byte delay to hide. TTFB is 159ms in the audit
+  (150ms of it simulated RTT).
+- The app's data lives in `localStorage` and is read on the client, so
+  `renderToPipeableStream` would need a server, a data source there, and a
+  hydration pass — a network round trip and a second render for HTML the browser
+  already receives in one packet. It would move the first paint behind the
+  server, not ahead of it.
+- What streaming would buy on a data-heavy page (a shell painted before the
+  data) is already covered on the critical path: the inline critical CSS gives
+  the first paint without a stylesheet request, the entry module is deferred, and
+  the below-fold sections and the canvas chunk mount after the first screen.
+- If the app is ever given a server render, revisit this: `renderToPipeableStream`
+  with the shell outside `<Suspense>` and the history list as the suspended
+  boundary is the shape to use, and the audit's FCP/LCP numbers are the baseline
+  to compare against.
+
+## 20. Interaction to Next Paint
+
+The audit now measures INP instead of assuming it. It taps the controls a first
+visitor actually meets, in the order they meet them: open the allowance step,
+go back, dismiss the intro, switch to Categories and back to Today, open the add
+sheet, close it. Each tap's Event Timing entry carries input delay + handler +
+presentation, and the audit reports the worst interaction and fails the run if
+it is over 200 ms.
+
+Measured: **104 ms**, the worst of 7 taps, for the allowance step — a React
+state change plus the focus move of the new step. The tab switches run through
+`document.startViewTransition`, and their taps measured faster than that, so
+the view transition is not an INP problem at this size. On a real handset that
+104 ms at 4x CPU throttle is roughly 25 ms of main-thread work.
+
+What was measured and deliberately not changed, so it is not retried:
+
+- **The first-run sheet's 460 ms slide-in** (`sheet[open]` in `deferred.css`)
+  is not on the critical path. Removing it, removing the staggered field fade,
+  or removing `backdrop-filter` from `::backdrop` all left FCP/LCP unchanged
+  within run-to-run noise (fast path 1156–1176 ms LCP in every variant). The
+  LCP element is the sheet's footer, but its paint is gated by the entry
+  script's execution, not by the animation.
+- **Deferring the deferred stylesheet's `media="all"` switch by one frame**
+  (it currently happens before React mounts) also changed nothing measurable
+  and kept CLS at 0, so the switch stays where it is, where it cannot cause a
+  flash of unstyled first paint.
+- **The 375 KB entry script is the critical path** (React DOM is ~625 KB of
+  source, the app ~230 KB, the icon library a few KB after tree-shaking), and
+  there is no dead weight in it to cut. A bootstrap skeleton in the HTML could
+  paint before the script, but it would replace itself on mount and risk the
+  CLS budget, so it is not done.
+
+## Limits of this analysis
+
+- No WebPageTest run: no API key was available. `npm run wpt` is ready for one.
+- The browser audit is Chromium only, one phone profile, first visit. Safari and
+  a warm (service-worker) load are not covered.
+- INP here is the worst of seven scripted taps, not the field p98 a real visitor
+  population produces. It covers the first-run controls and the view switches;
+  typing in a form, scrolling a long history list and long-press menus are not
+  part of the sample.
+- No visual review was done; the consent banner's placement was checked
+  functionally, not by eye.
+- The windowed history list was checked in Chromium by node count, document
+  height, scroll restoration and console errors. Its keyboard order was not
+  exercised with a screen reader, and find-on-page for off-screen rows is
+  deliberately unavailable (section 18).
