@@ -5,8 +5,13 @@
 // Without --url it serves ./dist itself, brotli files included, so the numbers
 // match what Vercel ships. It then loads the app in Chromium at a 390x844 phone
 // viewport with a 4x CPU slowdown and a slow 4G profile, and reports the
-// paint metrics, layout shift, DOM size, the critical request chain, and every
-// third-party request (there should be none without consent).
+// paint metrics, layout shift, the worst interaction (INP), DOM size, the
+// critical request chain, and every third-party request (there should be none
+// without consent).
+//
+// It fails the run when a Core Web Vital is over budget (FCP 1.8s, LCP 2.5s,
+// CLS 0.1, INP 200ms), when the full load takes over 3s, or when an interaction
+// it needs to tap can no longer be found.
 //
 // Service workers are blocked: this measures the first visit, where the network
 // is the whole story. Later visits are served from the cache and are not a
@@ -112,7 +117,7 @@ if (!flag('--no-throttle')) {
 }
 
 await page.addInitScript(() => {
-  window.__perf = { lcp: 0, cls: 0, shifts: [], unloadListeners: [] };
+  window.__perf = { lcp: 0, lcpEl: '', cls: 0, shifts: [], unloadListeners: [], interactions: new Map() };
   // `unload` (and, for the cache, `beforeunload`) makes a page ineligible for
   // the back/forward cache. Record any registration so the audit can fail.
   const on = EventTarget.prototype.addEventListener;
@@ -121,8 +126,29 @@ await page.addInitScript(() => {
     return on.call(this, type, ...rest);
   };
   new PerformanceObserver((list) => {
-    for (const entry of list.getEntries()) window.__perf.lcp = entry.startTime;
+    for (const entry of list.getEntries()) {
+      window.__perf.lcp = entry.startTime;
+      const node = entry.element;
+      window.__perf.lcpEl = node
+        ? `${node.tagName.toLowerCase()}${node.className ? `.${String(node.className).trim().split(/\s+/).join('.')}` : ''}`
+        : entry.url
+          ? 'image'
+          : 'text';
+    }
   }).observe({ type: 'largest-contentful-paint', buffered: true });
+  // Event Timing: one entry per interaction (plus per-event ones that share an
+  // interactionId). The interaction's duration is input delay + handler +
+  // presentation, which is what INP scores, so keep the worst per interaction.
+  new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      if (!entry.interactionId) continue;
+      const prev = window.__perf.interactions.get(entry.interactionId) || { duration: 0, name: '' };
+      if (entry.duration > prev.duration) prev.duration = entry.duration;
+      prev.name = entry.name;
+      prev.label = window.__perf.tapLabel || prev.label || entry.name;
+      window.__perf.interactions.set(entry.interactionId, prev);
+    }
+  }).observe({ type: 'event', buffered: true, durationThreshold: 16 });
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
       if (entry.hadRecentInput) continue;
@@ -157,11 +183,47 @@ const report = await page.evaluate(() => {
     load: nav.loadEventEnd - nav.startTime,
     fcp: paint['first-contentful-paint'] || null,
     lcp: window.__perf.lcp,
+    lcpEl: window.__perf.lcpEl,
     cls: Number(window.__perf.cls.toFixed(4)),
     shifts: window.__perf.shifts,
     domNodes: all.length,
     domDepth: depth,
     bodyNodes: document.body.getElementsByTagName('*').length
+  };
+});
+
+// INP: tap the controls a first-time visitor actually meets, in the order they
+// meet them (open the allowance step, go back, dismiss the intro, switch tabs,
+// open the add sheet and close it). Each tap's Event Timing entry is read by
+// the page's observer above; the worst one is the interaction number.
+const taps = [
+  ['allowance step', 'dialog[open] .btn.ink'],
+  ['step back', 'dialog[open] .text-btn'],
+  ['set up later', 'dialog[open] .text-btn'],
+  ['categories tab', '.bottom-nav a[href="#/categories"]'],
+  ['today tab', '.bottom-nav a[href="#/today"]'],
+  ['add sheet', '.fab'],
+  ['close sheet', 'dialog[open] .icon-btn']
+];
+const missedTaps = [];
+for (const [label, selector] of taps) {
+  try {
+    await page.evaluate((l) => {
+      window.__perf.tapLabel = l;
+    }, label);
+    await page.locator(selector).first().tap({ timeout: 4000 });
+    await page.waitForTimeout(400);
+  } catch {
+    missedTaps.push(label);
+  }
+}
+const inp = await page.evaluate(() => {
+  const list = [...window.__perf.interactions.values()];
+  const worst = list.reduce((a, b) => (b.duration > a.duration ? b : a), { duration: 0, name: '', label: '' });
+  return {
+    worst: Math.round(worst.duration),
+    label: `${worst.label || worst.name}`.trim(),
+    count: list.length
   };
 });
 
@@ -232,11 +294,19 @@ const total = firstVisitRequests.reduce((sum, r) => sum + (r.bytes || 0), 0);
 await browser.close();
 local?.server.close();
 
+// The brief's thresholds: FCP 1.8s, LCP 2.5s, CLS 0.1, INP 200ms, and a full
+// load under 3s. These are the numbers the run fails on, not decoration.
+const BUDGETS = { fcp: 1800, lcp: 2500, cls: 0.1, inp: 200, load: 3000 };
+
 const rows = [
   ['TTFB', `${Math.round(report.ttfb)} ms`],
   ['First Contentful Paint', report.fcp ? `${Math.round(report.fcp)} ms` : '—'],
-  ['Largest Contentful Paint', `${Math.round(report.lcp)} ms`],
+  ['Largest Contentful Paint', `${Math.round(report.lcp)} ms  (${report.lcpEl || 'unknown'})`],
   ['Cumulative Layout Shift', String(report.cls)],
+  [
+    'Interaction to Next Paint',
+    `${inp.count ? `${inp.worst} ms  (worst of ${inp.count}: ${inp.label})` : '—'}`
+  ],
   ['DOMContentLoaded', `${Math.round(report.domContentLoaded)} ms`],
   ['Load', `${Math.round(report.load)} ms`],
   ['DOM nodes', `${report.domNodes} (depth ${report.domDepth}, body ${report.bodyNodes})`],
@@ -268,17 +338,33 @@ for (const r of firstVisitRequests) {
   console.log(`    [${String(r.depth)}] ${r.type.padEnd(9)} ${size.padStart(8)}  ${r.url.replace(origin, '')}`);
 }
 
+const overBudget = [];
+if (report.fcp && report.fcp > BUDGETS.fcp) overBudget.push(`FCP ${Math.round(report.fcp)}ms > ${BUDGETS.fcp}`);
+if (report.lcp > BUDGETS.lcp) overBudget.push(`LCP ${Math.round(report.lcp)}ms > ${BUDGETS.lcp}`);
+if (report.cls > BUDGETS.cls) overBudget.push(`CLS ${report.cls} > ${BUDGETS.cls}`);
+if (report.load > BUDGETS.load) overBudget.push(`Load ${Math.round(report.load)}ms > ${BUDGETS.load}`);
+
 const failed =
-  report.cls > 0.1 ||
+  overBudget.length > 0 ||
+  !inp.count ||
+  inp.worst > BUDGETS.inp ||
+  missedTaps.length > 0 ||
   external.length > 0 ||
   renderBlocking.length > 0 ||
   !bfcache.restored ||
   !scrollRestored ||
   bfcache.unloadListeners.length > 0;
+
+for (const miss of overBudget) console.log(`    over budget: ${miss}`);
+if (!inp.count) console.log('    over budget: no interactions were measured, so INP is unproven');
+else if (inp.worst > BUDGETS.inp) console.log(`    over budget: INP ${inp.worst}ms > ${BUDGETS.inp}`);
+if (missedTaps.length) console.log(`    interaction not found: ${missedTaps.join(', ')}`);
 if (renderBlocking.length) for (const tag of renderBlocking) console.log(`    blocking: ${tag.slice(0, 140)}`);
 
 if (failed) {
-  console.error('\naudit: FAIL (CLS > 0.1, an unexpected third-party/blocking request, or a back/forward cache regression)');
+  console.error(
+    '\naudit: FAIL (a metric over budget, INP unmeasured, an unexpected third-party/blocking request, or a back/forward cache regression)'
+  );
   process.exitCode = 1;
 } else {
   console.log('\naudit: OK');
