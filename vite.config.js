@@ -142,14 +142,15 @@ const inlineCriticalCss = () => {
       if (!href) throw new Error('Deferred stylesheet is missing its href');
       html = html.replace(
         deferred[0],
-        `  <link rel="preload" as="style" href="${href}" />\n` +
+        `  <link rel="preload" as="style" href="${href}" fetchpriority="low" />\n` +
           `  ${deferred[0].trim()}\n` +
           `  <noscript><link rel="stylesheet" href="${href}" data-deferred-css /></noscript>\n`
       );
 
       const scripts = [];
       html = html.replace(/[ \t]*<script\b[^>]*\btype="module"[^>]*><\/script>[ \t]*\n?/g, (tag) => {
-        scripts.push(tag.trim());
+        // The entry script paints the first screen, so ask for it first.
+        scripts.push(tag.trim().replace('<script ', '<script fetchpriority="high" '));
         return '';
       });
       if (scripts.length) {
@@ -206,7 +207,7 @@ const preloadFont = () => ({
     return [
       {
         tag: 'link',
-        attrs: { rel: 'preload', as: 'font', type: 'font/woff2', href: `./${font}`, crossorigin: '' },
+        attrs: { rel: 'preload', as: 'font', type: 'font/woff2', href: `./${font}`, crossorigin: '', fetchpriority: 'high' },
         injectTo: 'head'
       }
     ];
