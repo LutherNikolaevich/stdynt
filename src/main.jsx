@@ -3,6 +3,11 @@ import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App, { announceNewBuild } from './App.jsx';
+import ConsentBanner from './ConsentBanner.jsx';
+import { initConsent } from './consent.js';
+
+// Declares the Consent Mode v2 defaults before any Google tag can exist.
+initConsent();
 
 // Critical styles are inlined in the document. The rest of the app's CSS is
 // linked with media="print" so the browser fetches it without blocking the
@@ -112,6 +117,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
+    <ConsentBanner />
   </React.StrictMode>
 );
 
@@ -144,8 +150,12 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   };
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      if (newBuildReady && !busy()) window.location.reload();
+    if (document.visibilityState === 'hidden') return;
+    // An update is applied with a navigation, so it waits until the page is
+    // visible again. Reloading while hidden would evict a page the browser
+    // could otherwise keep in its back/forward cache for the trip back.
+    if (newBuildReady && !busy()) {
+      window.location.reload();
       return;
     }
     if (Date.now() - lastCheck >= UPDATE_CHECK_MS) checkForNewBuild();

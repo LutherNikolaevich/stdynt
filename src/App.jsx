@@ -67,6 +67,7 @@ import {
   accountBalance
 } from './budget.js';
 import { prefersReducedMotion, useNearViewport } from './perf.jsx';
+import { ConsentCard } from './ConsentBanner.jsx';
 
 // The liquid canvas is an enhancement over the CSS level, so it loads as its
 // own chunk and starts after the first screen is already up.
@@ -1027,11 +1028,25 @@ export default function App() {
         window.location.hash = `/${lastMoneyViewRef.current}`;
       }
     };
+    // A page restored from the back/forward cache keeps its React state, but
+    // the browser restores no scroll position for it because the line above
+    // made restoration manual. Save the position on the way out and put it
+    // back when the page resumes from memory.
+    const onPageHide = () => {
+      scrollMemoRef.current[viewRef.current] = window.scrollY;
+    };
+    const onPageShow = (e) => {
+      if (e.persisted) window.scrollTo(0, scrollMemoRef.current[viewRef.current] || 0);
+    };
     window.addEventListener('hashchange', onHash);
     window.addEventListener('popstate', onPop);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('pageshow', onPageShow);
     return () => {
       window.removeEventListener('hashchange', onHash);
       window.removeEventListener('popstate', onPop);
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
 
@@ -4802,6 +4817,8 @@ export default function App() {
                   {updateState === 'idle' ? '' : updateLabel}
                 </p>
               </section>
+
+              <ConsentCard />
 
               <section className="card pad">
                 <h2>Your data</h2>
