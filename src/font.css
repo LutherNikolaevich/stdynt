@@ -1,3 +1,22 @@
+/* The fallback the app paints with until the woff2 arrives. Its metrics are
+   copied from the webfont so the swap changes the letterforms only: the ascent
+   and descent come from the font's own hhea table (930 and 270 at 1000 units,
+   see scripts/font-metrics.mjs), and size-adjust is the measured width ratio
+   between this face and the webfont, so a line of text wraps in the same place
+   and nothing below it moves. Arial is narrower than Bricolage, so the fallback
+   is scaled up; without that, every wrapped line re-flows when the real face
+   arrives. */
+@font-face {
+  font-family: 'Bricolage Fallback';
+  font-style: normal;
+  font-weight: 200 800;
+  src: local('Arial'), local('Helvetica Neue'), local('Helvetica');
+  size-adjust: 107.02%;
+  ascent-override: 86.9%;
+  descent-override: 25.23%;
+  line-gap-override: 0%;
+}
+
 @font-face {
   font-family: 'Bricolage Grotesque Variable';
   font-style: normal;

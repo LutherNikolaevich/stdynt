@@ -9,13 +9,26 @@ import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:z
 // Replaced by inlineCriticalCss with the hash of the inlined <style> block.
 const STYLE_HASH = '__CRITICAL_CSS_HASH__';
 
+// The Google tag is only ever loaded after consent (src/consent.js), and only
+// when a measurement ID is configured. Keeping its origins out of the policy
+// otherwise means a build with no analytics can never reach Google, even if a
+// bug did try.
+const GA_ID = String(process.env.VITE_GA_ID || '').trim();
+const analytics = GA_ID
+  ? {
+      script: ' https://www.googletagmanager.com',
+      img: ' https://*.google-analytics.com https://www.googletagmanager.com',
+      connect: ' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com'
+    }
+  : { script: '', img: '', connect: '' };
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  `script-src 'self'${analytics.script}`,
   `style-src 'self' ${STYLE_HASH}`,
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob:${analytics.img}`,
   "font-src 'self'",
-  "connect-src 'self'",
+  `connect-src 'self'${analytics.connect}`,
   "manifest-src 'self'",
   "worker-src 'self'",
   "object-src 'none'",
@@ -207,7 +220,12 @@ const preloadFont = () => ({
     return [
       {
         tag: 'link',
-        attrs: { rel: 'preload', as: 'font', type: 'font/woff2', href: `./${font}`, crossorigin: '', fetchpriority: 'high' },
+        // The first paint waits on the entry script, not on this font:
+        // the fallback face in font.css is metric-matched, so the text paints
+        // in it immediately and swaps with no shift. Asking for the font at a
+        // low priority keeps it from competing with the one render-blocking
+        // request for bandwidth on a slow connection.
+        attrs: { rel: 'preload', as: 'font', type: 'font/woff2', href: `./${font}`, crossorigin: '', fetchpriority: 'low' },
         injectTo: 'head'
       }
     ];
@@ -226,6 +244,11 @@ export default defineConfig({
     precompress(),
     precacheManifest()
   ],
+  build: {
+    // Maps are written next to the assets for error trackers to upload, with
+    // no sourceMappingURL comment, so browsers never fetch them for a visitor.
+    sourcemap: 'hidden'
+  },
   server: {
     port: 3000
   }
