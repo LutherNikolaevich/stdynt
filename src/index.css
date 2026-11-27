@@ -1375,6 +1375,17 @@
     list-style: none;
   }
 
+  /* Spacers that stand in for the rows a windowed list has not mounted. */
+  .list > .vpad {
+    padding: 0;
+    border: 0;
+    list-style: none;
+  }
+
+  .vpad + .history-day {
+    border-top: 0;
+  }
+
   .list-row {
     display: flex;
     align-items: center;

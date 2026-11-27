@@ -163,8 +163,9 @@ Measured 200 nodes on Today (depth 12) and 335 on the heaviest screen,
 Settings. That is small, and the structure is already lazy in the right way:
 one view is mounted at a time, below-fold sections wait for an intersection,
 history pages 10 days / 20 rows at a time, the well canvas is a separate idle
-chunk. No change was needed; the audit now prints the per-route count so growth
-is visible.
+chunk. The history list also windows its rows (section 18), so its node count no
+longer grows with the data. The audit prints the per-route count so growth is
+visible.
 
 ## 9. Duplicate JavaScript libraries
 
@@ -274,6 +275,64 @@ back what the browser does not.
   so the restore path is written to be a no-op when `event.persisted` is false
   rather than relied on for correctness.
 
+## 18. Virtualized long lists and tables
+
+The only collection that could grow without bound is history: it renders every
+entry the visitor owns, and "Show more" used to leave every earlier page mounted.
+Both of its lists (by date, and recently added) now render only the rows in or
+near the viewport, with two empty `<li>` spacers standing in for the rest.
+
+- `useWindowedRows` in `src/perf.jsx`: a prefix sum of measured row heights (48px
+  estimate until a row is seen), a binary search for the first and last visible
+  row on scroll, 900px of overscan above and below, and a `requestAnimationFrame`
+  scroll handler that only re-renders when the range actually changes. Row heights
+  are measured after layout (days can be expanded, so they are not constant) and
+  a row that reports a new height bumps the prefix sums.
+- The spacers keep the document height and therefore the native scrollbar, the
+  scroll position and the browser's own scrolling untouched: the page still
+  scrolls as one surface, there is no inner scroll container and no absolute
+  positioning, so find-on-page for on-screen text, focus and the back/forward
+  scroll restore behave as before.
+- Measured in Chromium at 390x844 with a history of 400 entries seeded into
+  `localStorage` and every page expanded, counting
+  `document.querySelectorAll('.list > li[data-vindex]')`: **51 rows in the DOM**
+  at peak (923 elements in the document), against
+  all 400 rows before the change. The document stayed 22,155px tall through
+  scrolls to the middle and the bottom, height drift was 0px, scrolling back to
+  2200 landed at 2200 both times, and the console stayed clean.
+- Day mode with 60 days / 400 entries: 51 of 60 day rows mounted at peak, 1px
+  height drift from measurement rounding, same scroll behaviour.
+- Tradeoff, deliberately taken: off-screen rows are not in the document, so
+  browser find (Ctrl+F) and a screen reader's virtual cursor only reach what is
+  mounted. "Show more" still controls how much data is in the list; windowing
+  only controls how much of it is in the DOM.
+- There are no `<table>` elements in the app, so nothing else needed it. The
+  other lists (subs, loans, accounts, categories) are bounded by user input at a
+  few dozen rows and were left alone.
+
+## 19. Streaming HTML before the response is ready
+
+Not applicable to this build, and not faked:
+
+- `index.html` is a static file with no server render. It is a fixed 10 KB
+  document — inline critical CSS plus `<div id="root">` — served by the CDN with
+  no application server in the path, so there is no HTML to produce
+  incrementally and no first-byte delay to hide. TTFB is 159ms in the audit
+  (150ms of it simulated RTT).
+- The app's data lives in `localStorage` and is read on the client, so
+  `renderToPipeableStream` would need a server, a data source there, and a
+  hydration pass — a network round trip and a second render for HTML the browser
+  already receives in one packet. It would move the first paint behind the
+  server, not ahead of it.
+- What streaming would buy on a data-heavy page (a shell painted before the
+  data) is already covered on the critical path: the inline critical CSS gives
+  the first paint without a stylesheet request, the entry module is deferred, and
+  the below-fold sections and the canvas chunk mount after the first screen.
+- If the app is ever given a server render, revisit this: `renderToPipeableStream`
+  with the shell outside `<Suspense>` and the history list as the suspended
+  boundary is the shape to use, and the audit's FCP/LCP numbers are the baseline
+  to compare against.
+
 ## Limits of this analysis
 
 - No WebPageTest run: no API key was available. `npm run wpt` is ready for one.
@@ -281,3 +340,7 @@ back what the browser does not.
   a warm (service-worker) load are not covered.
 - No visual review was done; the consent banner's placement was checked
   functionally, not by eye.
+- The windowed history list was checked in Chromium by node count, document
+  height, scroll restoration and console errors. Its keyboard order was not
+  exercised with a screen reader, and find-on-page for off-screen rows is
+  deliberately unavailable (section 18).
