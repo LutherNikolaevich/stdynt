@@ -11,22 +11,23 @@ a reproducible baseline, not a third-party score.
 | Command | What it does |
 |---|---|
 | `npm run build` | Production build (inlined critical CSS, deferred sheet, precompressed, source maps) |
-| `npm run audit` | Serves `dist/` in a real browser and reports paint metrics, CLS, DOM size, the request chain, third-party requests, render-blocking tags and back/forward cache restore. Exits non-zero on a regression. `--url https://...` audits a deployment instead. |
+| `npm run audit` | Serves `dist/` in a real browser and reports paint metrics, CLS, the worst interaction (INP), DOM size, the request chain, third-party requests, render-blocking tags and back/forward cache restore. It taps the real controls a first visitor meets to measure INP, and exits non-zero when FCP passes 1.8s, LCP 2.5s, CLS 0.1, INP 200ms or the full load 3s, or on any other regression. `--url https://...` audits a deployment instead. |
 | `npm run wpt` | Submits a WebPageTest run (needs `WPT_API_KEY` and `WPT_URL`, optional `WPT_LOCATION`, `WPT_RUNS`) and prints the median run. |
 | `npm run font-metrics -- <file.woff2>` | Reports a font's axes and raw metrics; derives the fallback overrides. |
 
 ## Baseline
 
 ```
-TTFB                     154 ms   (150 ms of that is the simulated RTT)
-First Contentful Paint   1148 ms
-Largest Contentful Paint 1312 ms
+TTFB                     157 ms   (150 ms of that is the simulated RTT)
+First Contentful Paint   1260 ms
+Largest Contentful Paint 1412 ms   (div.sheet-foot — the first-run setup sheet)
 Cumulative Layout Shift  0
-DOMContentLoaded          940 ms
-Load                      947 ms
+Interaction to Next Paint 104 ms   (worst of 7 real taps)
+DOMContentLoaded          965 ms
+Load                      972 ms
 DOM nodes                200 (depth 12)
 DOM per route            today 200 · categories 188 · subs 203 · loans 220 · accounts 219 · settings 335
-Requests                 5 (109 KB encoded)
+Requests                 5 (110 KB encoded)
 Render-blocking tags     none
 Third-party requests     none
 
@@ -40,6 +41,12 @@ request chain
 Depth is 2: the document, then everything else in parallel. The entry script is
 the only resource the first paint waits on, and it is a module script, so the
 parser never blocks on it.
+
+All five budgets are met with room: FCP has 540 ms of headroom under 1.8s, LCP
+1090 ms under 2.5s, CLS is 0, INP 104 ms against 200 ms, and the full load is
+972 ms against 3s. The first load in a cold browser is the slow case (it can
+add a second ~200 ms main-thread task while V8 compiles the entry), which is
+what the audit measures; warm reloads land near 1000 ms FCP.
 
 ## 1. WebPageTest analysis
 
@@ -151,11 +158,15 @@ playsinline>` with WebM + MP4 and a still `poster`, not a GIF.
 throttle, slow 4G, service worker blocked so the network is the whole story. It
 collects FCP/LCP/CLS from `PerformanceObserver` (with each shift's source node),
 TTFB and load from the navigation timing entry, DOM node count and depth, the
-request chain with encoded bytes, and every third-party request. It fails the
-run if CLS exceeds 0.1, if anything is third-party, or if the markup has a
-render-blocking tag.
+request chain with encoded bytes, and every third-party request. It also taps
+the first-run controls and reads Event Timing, so INP is measured rather than
+assumed (section 20). It fails the run when FCP/LCP/CLS/INP or the full load is
+over the budget in the Baseline section, when INP could not be measured, when
+anything is third-party, when the markup has a render-blocking tag, or on a
+back/forward cache regression.
 
-Current result: `audit: OK`. CLS is 0 with no shifts recorded.
+Current result: `audit: OK`. CLS is 0 with no shifts recorded, FCP 1260 ms, LCP
+1412 ms, INP 104 ms and a 972 ms load.
 
 ## 8. DOM size and complexity
 
@@ -333,11 +344,48 @@ Not applicable to this build, and not faked:
   boundary is the shape to use, and the audit's FCP/LCP numbers are the baseline
   to compare against.
 
+## 20. Interaction to Next Paint
+
+The audit now measures INP instead of assuming it. It taps the controls a first
+visitor actually meets, in the order they meet them: open the allowance step,
+go back, dismiss the intro, switch to Categories and back to Today, open the add
+sheet, close it. Each tap's Event Timing entry carries input delay + handler +
+presentation, and the audit reports the worst interaction and fails the run if
+it is over 200 ms.
+
+Measured: **104 ms**, the worst of 7 taps, for the allowance step — a React
+state change plus the focus move of the new step. The tab switches run through
+`document.startViewTransition`, and their taps measured faster than that, so
+the view transition is not an INP problem at this size. On a real handset that
+104 ms at 4x CPU throttle is roughly 25 ms of main-thread work.
+
+What was measured and deliberately not changed, so it is not retried:
+
+- **The first-run sheet's 460 ms slide-in** (`sheet[open]` in `deferred.css`)
+  is not on the critical path. Removing it, removing the staggered field fade,
+  or removing `backdrop-filter` from `::backdrop` all left FCP/LCP unchanged
+  within run-to-run noise (fast path 1156–1176 ms LCP in every variant). The
+  LCP element is the sheet's footer, but its paint is gated by the entry
+  script's execution, not by the animation.
+- **Deferring the deferred stylesheet's `media="all"` switch by one frame**
+  (it currently happens before React mounts) also changed nothing measurable
+  and kept CLS at 0, so the switch stays where it is, where it cannot cause a
+  flash of unstyled first paint.
+- **The 375 KB entry script is the critical path** (React DOM is ~625 KB of
+  source, the app ~230 KB, the icon library a few KB after tree-shaking), and
+  there is no dead weight in it to cut. A bootstrap skeleton in the HTML could
+  paint before the script, but it would replace itself on mount and risk the
+  CLS budget, so it is not done.
+
 ## Limits of this analysis
 
 - No WebPageTest run: no API key was available. `npm run wpt` is ready for one.
 - The browser audit is Chromium only, one phone profile, first visit. Safari and
   a warm (service-worker) load are not covered.
+- INP here is the worst of seven scripted taps, not the field p98 a real visitor
+  population produces. It covers the first-run controls and the view switches;
+  typing in a form, scrolling a long history list and long-press menus are not
+  part of the sample.
 - No visual review was done; the consent banner's placement was checked
   functionally, not by eye.
 - The windowed history list was checked in Chromium by node count, document
