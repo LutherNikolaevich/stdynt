@@ -5,10 +5,8 @@ import {
   ChartPie,
   Repeat,
   HandCoins,
-  Settings,
   Plus,
   X,
-  ArrowLeft,
   Download,
   Upload,
   TriangleAlert,
@@ -68,6 +66,7 @@ import {
 } from './budget.js';
 import { prefersReducedMotion, useNearViewport, useWindowedRows } from './perf.jsx';
 import { ConsentCard } from './ConsentBanner.jsx';
+import Shell from './Shell.jsx';
 
 // The liquid canvas is an enhancement over the CSS level, so it loads as its
 // own chunk and starts after the first screen is already up.
@@ -3188,131 +3187,96 @@ export default function App() {
     accounts.length > 2 && accounts.some((a) => a.type === 'ewallet') && accounts.some((a) => a.type !== 'ewallet');
   const fabTarget = ADD_FORMS[view];
 
+  const fab = fabTarget ? (
+    fabTarget[0] === 'add-accounts' ? (
+      <>
+        {fabOpen && (
+          <div className="fab-actions">
+            <button
+              type="button"
+              className="fab-action"
+              onClick={() => {
+                setFabOpen(false);
+                openAddSheet('account');
+              }}
+              aria-label="Add account"
+            >
+              <Wallet size={20} strokeWidth={2} aria-hidden="true" />
+              <span>Add account</span>
+            </button>
+            <button
+              type="button"
+              className="fab-action"
+              onClick={() => {
+                setFabOpen(false);
+                openAddSheet('transfer');
+              }}
+              aria-label="Transfer money"
+            >
+              <ArrowLeftRight size={20} strokeWidth={2} aria-hidden="true" />
+              <span>Transfer</span>
+            </button>
+            <button
+              type="button"
+              className="fab-action"
+              onClick={() => {
+                setFabOpen(false);
+                openAddSheet('goal');
+              }}
+              aria-label="New savings goal"
+            >
+              <PiggyBank size={20} strokeWidth={2} aria-hidden="true" />
+              <span>Savings goals</span>
+            </button>
+          </div>
+        )}
+        <button
+          className="fab compact"
+          onClick={() => setFabOpen((o) => !o)}
+          aria-label={fabOpen ? 'Close add menu' : fabTarget[1]}
+          aria-expanded={fabOpen}
+          aria-keyshortcuts="N"
+        >
+          {fabOpen ? (
+            <X size={22} strokeWidth={2.5} aria-hidden="true" />
+          ) : (
+            <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
+          )}
+          {!fabOpen && <kbd className="nav-kbd" aria-hidden="true">N</kbd>}
+        </button>
+      </>
+    ) : (
+      <button
+        className="fab compact"
+        onClick={() => (view === 'today' ? openSheet() : openAddSheet())}
+        aria-label={fabTarget[1]}
+        aria-keyshortcuts="N"
+      >
+        <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
+        <kbd className="nav-kbd" aria-hidden="true">N</kbd>
+      </button>
+    )
+  ) : null;
+
   return (
     <div className={`app view-${view}`}>
-      <header className={`topbar ${scrolled ? 'is-scrolled' : ''}`}>
-        {isSettings ? (
-          <a
-            className="icon-btn back-btn"
-            href={`#/${lastMoneyViewRef.current}`}
-            onClick={onBackClick}
-            aria-label={`Back to ${MONEY_VIEWS.find((v) => v.id === lastMoneyViewRef.current)?.label || 'Today'}`}
-            aria-keyshortcuts="Escape"
-            title="Back (Esc)"
-          >
-            <ArrowLeft size={22} strokeWidth={2} aria-hidden="true" />
-          </a>
-        ) : (
-          <span className="brand">stdynt</span>
-        )}
-        <span className={view === 'today' && hasDaily ? 'sr-only' : 'topbar-date'}>
-          {parseDate(todayStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-        </span>
-        {!isSettings && (
-          <a
-            className="icon-btn settings-btn"
-            href="#/settings"
-            aria-label="Settings"
-            aria-keyshortcuts=","
-            title="Settings (,)"
-          >
-            <Settings size={22} strokeWidth={2} aria-hidden="true" />
-          </a>
-        )}
-      </header>
-
-      <div className="rail">
-        {fabTarget && fabTarget[0] === 'add-accounts' && (
-          <>
-            {fabOpen && (
-              <div className="fab-actions">
-                <button
-                  type="button"
-                  className="fab-action"
-                  onClick={() => {
-                    setFabOpen(false);
-                    openAddSheet('account');
-                  }}
-                  aria-label="Add account"
-                >
-                  <Wallet size={20} strokeWidth={2} aria-hidden="true" />
-                  <span>Add account</span>
-                </button>
-                <button
-                  type="button"
-                  className="fab-action"
-                  onClick={() => {
-                    setFabOpen(false);
-                    openAddSheet('transfer');
-                  }}
-                  aria-label="Transfer money"
-                >
-                  <ArrowLeftRight size={20} strokeWidth={2} aria-hidden="true" />
-                  <span>Transfer</span>
-                </button>
-                <button
-                  type="button"
-                  className="fab-action"
-                  onClick={() => {
-                    setFabOpen(false);
-                    openAddSheet('goal');
-                  }}
-                  aria-label="New savings goal"
-                >
-                  <PiggyBank size={20} strokeWidth={2} aria-hidden="true" />
-                  <span>Savings goals</span>
-                </button>
-              </div>
-            )}
-            <button
-              className="fab compact"
-              onClick={() => setFabOpen((o) => !o)}
-              aria-label={fabOpen ? 'Close add menu' : fabTarget[1]}
-              aria-expanded={fabOpen}
-              aria-keyshortcuts="N"
-            >
-              {fabOpen ? (
-                <X size={22} strokeWidth={2.5} aria-hidden="true" />
-              ) : (
-                <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
-              )}
-              {!fabOpen && <kbd className="nav-kbd" aria-hidden="true">N</kbd>}
-            </button>
-          </>
-        )}
-        {fabTarget && fabTarget[0] !== 'add-accounts' && (
-          <button
-            className="fab compact"
-            onClick={() => (view === 'today' ? openSheet() : openAddSheet())}
-            aria-label={fabTarget[1]}
-            aria-keyshortcuts="N"
-          >
-            <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
-            <kbd className="nav-kbd" aria-hidden="true">N</kbd>
-          </button>
-        )}
-        <nav className="bottom-nav" aria-label="Money">
-          {MONEY_VIEWS.map(({ id, label, Icon }, i) => (
-            <a
-              key={id}
-              href={`#/${id}`}
-              onClick={(e) => onNavClick(e, id)}
-              aria-current={view === id ? 'page' : undefined}
-              aria-keyshortcuts={String(i + 1)}
-              aria-label={label}
-            >
-              {view === id && <span className="nav-ink" aria-hidden="true" />}
-              <span className="nav-icon">
-                <Icon size={22} strokeWidth={2} aria-hidden="true" />
-              </span>
-              <span className="nav-label">{label}</span>
-              <kbd className="nav-kbd" aria-hidden="true">{i + 1}</kbd>
-            </a>
-          ))}
-        </nav>
-      </div>
-
-      <main className="main">
+      <Shell
+        view={view}
+        isSettings={isSettings}
+        scrolled={scrolled}
+        dateLabel={parseDate(todayStr).toLocaleDateString('en-GB', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short'
+        })}
+        hideDate={view === 'today' && hasDaily}
+        moneyViews={MONEY_VIEWS}
+        onNavClick={onNavClick}
+        onBackClick={onBackClick}
+        backHref={`#/${lastMoneyViewRef.current}`}
+        backLabel={`Back to ${MONEY_VIEWS.find((v) => v.id === lastMoneyViewRef.current)?.label || 'Today'}`}
+        fab={fab}
+      >
         {storageCorrupted && (
           <div className="slip over storage-slip" role="alert">
             <TriangleAlert size={18} strokeWidth={2.25} aria-hidden="true" />
@@ -4889,7 +4853,7 @@ export default function App() {
           )}
         </div>
 
-      </main>
+      </Shell>
 
       <div className="live-slot" role="status">
         {undo ? (
