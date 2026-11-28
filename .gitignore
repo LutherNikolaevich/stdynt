@@ -3,6 +3,7 @@ dist/
 docs/
 .opencode/
 .superpowers/
+.freebuff/
 
 .DS_Store
 *.md
