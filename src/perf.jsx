@@ -87,11 +87,18 @@ export const useWindowedRows = (count, { estimate = ROW_ESTIMATE, overscan = ROW
   useLayoutEffect(() => {
     if (!listEl || count === 0) return undefined;
     let frame = 0;
+    // A list can live inside its own scroll region (the desktop history table).
+    // Its window then follows that region, not the page.
+    const scroller = listEl.closest('[data-scroll-region]');
 
     const update = () => {
-      const top = listEl.getBoundingClientRect().top + window.scrollY;
-      const from = Math.max(0, window.scrollY - top - overscan);
-      const to = window.scrollY + window.innerHeight - top + overscan;
+      const scrollTop = scroller ? scroller.scrollTop : window.scrollY;
+      const viewH = scroller ? scroller.clientHeight : window.innerHeight;
+      const top = scroller
+        ? listEl.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+        : listEl.getBoundingClientRect().top + window.scrollY;
+      const from = Math.max(0, scrollTop - top - overscan);
+      const to = scrollTop + viewH - top + overscan;
       const start = rowAt(offsets, from);
       const end = Math.min(count, rowAt(offsets, Math.max(from, to)) + 1);
       setWin((w) => (w.start === start && w.end === end ? w : { start, end }));
@@ -118,12 +125,16 @@ export const useWindowedRows = (count, { estimate = ROW_ESTIMATE, overscan = ROW
     };
 
     update();
-    window.addEventListener('scroll', schedule, { passive: true });
+    const scrollTarget = scroller || window;
+    scrollTarget.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule);
+    const ro = scroller && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
+    if (scroller) ro.observe(scroller);
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', schedule);
+      scrollTarget.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
+      ro?.disconnect();
     };
   }, [listEl, offsets, count, overscan, estimate]);
 

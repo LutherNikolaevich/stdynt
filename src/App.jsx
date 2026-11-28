@@ -550,7 +550,40 @@ function Fold({ id, label, open, onToggle, summary, className = '' }) {
   );
 }
 
-const isWideScreen = () => typeof window !== 'undefined' && !!window.matchMedia?.('(min-width: 1000px)').matches;
+// Tracks a media query so a layout can swap when the viewport crosses it, not
+// only on the next render.
+const useMediaMatch = (query) => {
+  const [match, setMatch] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches);
+  useEffect(() => {
+    const mql = window.matchMedia?.(query);
+    if (!mql) return undefined;
+    const onChange = () => setMatch(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, [query]);
+  return match;
+};
+
+const useWideScreen = () => useMediaMatch('(min-width: 1000px)');
+
+// A scroll region that sits below other content has to stop at the fold, and
+// only the layout knows where it starts. Writing that offset as a custom
+// property lets CSS size it to the rest of the window.
+const useFoldOffset = (el) => {
+  useEffect(() => {
+    if (!el) return undefined;
+    const apply = () => {
+      el.style.setProperty('--fold-top', `${Math.round(el.getBoundingClientRect().top + window.scrollY)}px`);
+    };
+    const frame = requestAnimationFrame(apply);
+    window.addEventListener('resize', apply);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', apply);
+    };
+  }, [el]);
+};
 
 const STAMP_MAX_CHARS = 13;
 
@@ -643,6 +676,47 @@ function MoneyFit({ parts, sym, className = '' }) {
 }
 
 const Money = ({ value, sym, sign }) => <MoneyFit sym={sym} parts={[{ value, sign }]} />;
+
+// A scroll region that is only partly visible needs a cue, and macOS draws no
+// scrollbar until the wheel turns. This rail tracks the region's real scroll
+// position and stays out of the way when the platform draws a bar itself, so a
+// cut list always reads as scrollable rather than broken.
+function ScrollRail({ target }) {
+  const [rail, setRail] = useState(null);
+  useEffect(() => {
+    const el = target;
+    if (!el) return undefined;
+    const update = () => {
+      // A classic (non-overlay) scrollbar is already a visible cue.
+      if (el.offsetWidth - el.clientWidth > 0) {
+        setRail(null);
+        return;
+      }
+      const max = el.scrollHeight - el.clientHeight;
+      if (max <= 1) {
+        setRail(null);
+        return;
+      }
+      const height = Math.max(14, Math.round((el.clientHeight / el.scrollHeight) * 100));
+      const top = Math.round((el.scrollTop / max) * (100 - height));
+      setRail({ height, top });
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener('scroll', update);
+      ro?.disconnect();
+    };
+  }, [target]);
+  if (!rail) return null;
+  return (
+    <span className="scroll-rail" aria-hidden="true">
+      <span className="scroll-thumb" style={{ height: `${rail.height}%`, top: `${rail.top}%` }} />
+    </span>
+  );
+}
 
 const PLAN_FREQUENCY_LABELS = { weekly: 'Weekly', biweekly: 'Every 2 weeks', monthly: 'Monthly', custom: 'Custom' };
 
@@ -827,6 +901,15 @@ export default function App() {
   const [settingsFormKey, setSettingsFormKey] = useState(0);
   const [historyNearRef, historyNear] = useNearViewport();
   const [trendNearRef, trendNear] = useNearViewport();
+  const [catScrollEl, setCatScrollEl] = useState(null);
+  const [loanScrollEl, setLoanScrollEl] = useState(null);
+  const [subsScrollEl, setSubsScrollEl] = useState(null);
+  const [historyScrollEl, setHistoryScrollEl] = useState(null);
+  const [accountsScrollEl, setAccountsScrollEl] = useState(null);
+  useFoldOffset(historyScrollEl);
+  // The History table needs the full-width panel, which starts at the one-shell
+  // breakpoint; below it the panel is a narrow column and keeps its list.
+  const tableLayout = useMediaMatch('(min-width: 1280px)');
 
   // The liquid canvas is an enhancement: let the first screen paint its level
   // from CSS first, then fetch and start the canvas when the browser is idle.
@@ -1438,19 +1521,23 @@ export default function App() {
     });
   };
 
+  // Both sorts group into days, because the desktop table is always a day
+  // table. The Map keeps the order of first appearance: newest day first for
+  // "By date", and the day of the most recently added entry first for
+  // "Recently added".
   const historyDays = [];
-  if (historySort === 'date') {
-    for (const e of historyEntries) {
-      const date = e.date || todayStr;
-      let day = historyDays[historyDays.length - 1];
-      if (!day || day.date !== date) {
-        day = { date, entries: [], spent: 0, earned: 0 };
-        historyDays.push(day);
-      }
-      day.entries.push(e);
-      if (e.kind === 'income') day.earned += Number(e.amount) || 0;
-      else day.spent += Number(e.amount) || 0;
+  const dayByDate = new Map();
+  for (const e of historyEntries) {
+    const date = e.date || todayStr;
+    let day = dayByDate.get(date);
+    if (!day) {
+      day = { date, entries: [], spent: 0, earned: 0 };
+      dayByDate.set(date, day);
+      historyDays.push(day);
     }
+    day.entries.push(e);
+    if (e.kind === 'income') day.earned += Number(e.amount) || 0;
+    else day.spent += Number(e.amount) || 0;
   }
   const historyDaysShown = historySort === 'date' ? historyDays.slice(0, historyPages * HISTORY_DAYS_STEP) : [];
   const historyRowsShown = historySort === 'date' ? [] : historyEntries.slice(0, historyPages * HISTORY_ROWS_STEP);
@@ -1458,6 +1545,13 @@ export default function App() {
   const dayWindow = useWindowedRows(historyDaysShown.length, { resetKey: `d:${historyWindowKey}` });
   const rowWindow = useWindowedRows(historyRowsShown.length, { resetKey: `r:${historyWindowKey}` });
   const dayOpen = (date) => historyFiltered !== dayToggles.has(date);
+  // The desktop table windows whole days: each day is one `<tbody>`, so an
+  // expanded day contributes its entries to that day's measured height. Opening
+  // a day does not reset the window, so the row under the pointer stays put;
+  // the next scroll pass remeasures the taller day.
+  const tableWindow = useWindowedRows(historyDays.length, {
+    resetKey: `t:${historyWindowKey}`
+  });
   const toggleDay = (date) =>
     setDayToggles((s) => {
       const next = new Set(s);
@@ -1465,6 +1559,21 @@ export default function App() {
       else next.add(date);
       return next;
     });
+  // Up/Down move between mounted day rows, Enter (or Space) expands one.
+  const onHistoryRowKey = (e, date) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleDay(date);
+      return;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const rows = [...(e.currentTarget.closest('table')?.querySelectorAll('tbody > tr.ht-row') || [])];
+    const at = rows.indexOf(e.currentTarget);
+    const next = rows[at + (e.key === 'ArrowDown' ? 1 : -1)];
+    if (!next) return;
+    e.preventDefault();
+    next.focus();
+  };
 
   const hasAnyEntries =
     data.expenses.length + data.income.length + data.subscriptions.length + data.debts.length + accounts.length > 0;
@@ -1509,6 +1618,12 @@ export default function App() {
     if (av === bv) return loanName(a.debt).localeCompare(loanName(b.debt));
     return av < bv ? -sign : sign;
   });
+  const shownOwed = round2(
+    sortedLoans.filter(({ debt }) => debt.type === 'i_owe').reduce((s, { sum }) => s + sum.remaining, 0)
+  );
+  const shownOwedToMe = round2(
+    sortedLoans.reduce((s, { sum }) => s + sum.remaining, 0) - shownOwed
+  );
   const toggleLoanSort = (key) =>
     setLoanSort((s) => ({ key, dir: s.key === key ? (s.dir === 'asc' ? 'desc' : 'asc') : key === 'due' ? 'asc' : 'desc' }));
   const loanSortHeader = (key, label) => {
@@ -1948,6 +2063,42 @@ export default function App() {
             {meta && <small>{meta}</small>}
           </span>
           <span className="num amt">{entryAmount(exp)}</span>
+        </button>
+        <button
+          className="row-del"
+          onClick={() => deleteExpense(exp)}
+          aria-label={`Delete ${entryLabel(exp)}, ${entryAmount(exp)}`}
+        >
+          <X size={16} strokeWidth={2.25} />
+        </button>
+      </li>
+    );
+  };
+
+  // The desktop table's expanded entry: every field the row carries — time,
+  // note, category, account and amount — on one line.
+  const renderHistoryEntry = (exp) => {
+    const isIncome = exp.kind === 'income';
+    const meta = [exp.note ? (isIncome ? 'Income' : exp.category) : '', accountLabel(exp.accountId), parseEntryClock(exp)]
+      .filter(Boolean)
+      .join(' · ');
+    return (
+      <li key={exp.id} className="list-row ht-entry" data-row={exp.id}>
+        <button
+          type="button"
+          className="row-open"
+          onClick={() => openSheet(exp)}
+          aria-label={`Edit ${entryLabel(exp)}, ${entryAmount(exp)}`}
+        >
+          <span
+            className={`cat-dot ${isIncome ? 'income-dot' : ''}`}
+            style={isIncome ? undefined : { background: colorOf(exp.category) }}
+          />
+          <span className="list-main">
+            <span>{entryLabel(exp)}</span>
+            {meta && <small>{meta}</small>}
+          </span>
+          <span className={`num amt ${isIncome ? 'day-in' : ''}`}>{entryAmount(exp)}</span>
         </button>
         <button
           className="row-del"
@@ -3316,7 +3467,7 @@ export default function App() {
 
   const isSettings = view === 'settings';
   const earlierOpen = data.prefs.earlierOpen ?? false;
-  const wide = isWideScreen();
+  const wide = useWideScreen();
   const budgetMoreOpen = data.prefs.budgetMoreOpen ?? wide;
   const historyToolsOpen = data.prefs.historyToolsOpen ?? false;
   const historyToolsOn = historyCat !== '' || historySort !== 'date';
@@ -3831,6 +3982,7 @@ export default function App() {
                   <p className="empty">Nothing logged yet.</p>
                 ) : (
                   <>
+                    <div className="history-toolbar">
                     <div className="history-tools" role="search">
                       <label className="hfield hsearch">
                         <span className="sr-only">Search</span>
@@ -3891,6 +4043,7 @@ export default function App() {
                         ))}
                       </fieldset>
                     </div>
+                    </div>
                     {historyFiltered && (
                       <p className="filter-count" role="status">
                         {historyEntries.length === 0
@@ -3901,7 +4054,90 @@ export default function App() {
                         </button>
                       </p>
                     )}
-                    {historySort === 'date' ? (
+                    {tableLayout ? (
+                      <div className="scroll-shell">
+                      <div className="history-table-wrap" ref={setHistoryScrollEl} data-scroll-region>
+                        <table className="history-table" ref={tableWindow.setListEl}>
+                          <colgroup>
+                            <col className="ht-col-date" />
+                            <col className="ht-col-in" />
+                            <col className="ht-col-out" />
+                            <col className="ht-col-net" />
+                            <col className="ht-col-count" />
+                          </colgroup>
+                          <thead>
+                            <tr>
+                              <th scope="col">Date</th>
+                              <th scope="col" className="ht-num">In ({sym})</th>
+                              <th scope="col" className="ht-num">Out ({sym})</th>
+                              <th scope="col" className="ht-num">Net ({sym})</th>
+                              <th scope="col" className="ht-num">Entries</th>
+                            </tr>
+                          </thead>
+                          {tableWindow.padTop > 0 && (
+                            <tbody className="vpad" aria-hidden="true">
+                              <tr>
+                                <td colSpan={5} style={{ height: tableWindow.padTop }} />
+                              </tr>
+                            </tbody>
+                          )}
+                          {historyDays.slice(tableWindow.start, tableWindow.end).map((day, j) => {
+                            const i = tableWindow.start + j;
+                            const open = dayOpen(day.date);
+                            const n = day.entries.length;
+                            const net = round2(day.earned - day.spent);
+                            const panelId = `history-table-day-${day.date}`;
+                            return (
+                              <tbody
+                                key={day.date}
+                                id={panelId}
+                                className={`ht-day ${open ? 'is-open' : ''}`}
+                                data-vindex={i}
+                              >
+                                <tr
+                                  className="ht-row"
+                                  tabIndex={0}
+                                  aria-expanded={open}
+                                  aria-controls={panelId}
+                                  onClick={() => toggleDay(day.date)}
+                                  onKeyDown={(e) => onHistoryRowKey(e, day.date)}
+                                >
+                                  <td className="ht-date">
+                                    <ChevronDown className="ht-chev" size={18} strokeWidth={2.25} aria-hidden="true" />
+                                    <span>{historyDayLabel(day.date, todayStr)}</span>
+                                  </td>
+                                  <td className="ht-num ht-in">{day.earned > 0 ? formatNumber(day.earned, sym) : '—'}</td>
+                                  <td className="ht-num">{day.spent > 0 ? formatNumber(day.spent, sym) : '—'}</td>
+                                  <td className={`ht-num${net < 0 ? ' ht-neg' : ''}`}>
+                                    {net === 0
+                                      ? formatNumber(0, sym)
+                                      : `${net > 0 ? '+' : '−'}${formatNumber(net, sym)}`}
+                                  </td>
+                                  <td className="ht-num ht-count">{n}</td>
+                                </tr>
+                                {open &&
+                                  day.entries.map((exp) => (
+                                    <tr className="ht-entry-row" key={exp.id}>
+                                      <td colSpan={5}>
+                                        <ul className="day-rows">{renderHistoryEntry(exp)}</ul>
+                                      </td>
+                                    </tr>
+                                  ))}
+                              </tbody>
+                            );
+                          })}
+                          {tableWindow.padBottom > 0 && (
+                            <tbody className="vpad" aria-hidden="true">
+                              <tr>
+                                <td colSpan={5} style={{ height: tableWindow.padBottom }} />
+                              </tr>
+                            </tbody>
+                          )}
+                        </table>
+                      </div>
+                      <ScrollRail target={historyScrollEl} />
+                      </div>
+                    ) : historySort === 'date' ? (
                       <ul className="list" ref={dayWindow.setListEl}>
                         {dayWindow.padTop > 0 && (
                           <li className="vpad" aria-hidden="true" style={{ height: dayWindow.padTop }} />
@@ -3959,23 +4195,24 @@ export default function App() {
                         )}
                       </ul>
                     )}
-                    {(() => {
-                      const [total, step, one, many] =
-                        historySort === 'date'
-                          ? [historyDays.length, HISTORY_DAYS_STEP, 'day', 'days']
-                          : [historyEntries.length, HISTORY_ROWS_STEP, 'entry', 'entries'];
-                      const left = total - historyPages * step;
-                      if (left <= 0) return null;
-                      const next = Math.min(step, left);
-                      return (
-                        <button type="button" className="more-btn" onClick={() => setHistoryPages((p) => p + 1)}>
-                          <span>
-                            Show {next} more {next === 1 ? one : many}
-                          </span>
-                          {left > next && <small>{left} left</small>}
-                        </button>
-                      );
-                    })()}
+                    {!tableLayout &&
+                      (() => {
+                        const [total, step, one, many] =
+                          historySort === 'date'
+                            ? [historyDays.length, HISTORY_DAYS_STEP, 'day', 'days']
+                            : [historyEntries.length, HISTORY_ROWS_STEP, 'entry', 'entries'];
+                        const left = total - historyPages * step;
+                        if (left <= 0) return null;
+                        const next = Math.min(step, left);
+                        return (
+                          <button type="button" className="more-btn" onClick={() => setHistoryPages((p) => p + 1)}>
+                            <span>
+                              Show {next} more {next === 1 ? one : many}
+                            </span>
+                            {left > next && <small>{left} left</small>}
+                          </button>
+                        );
+                      })()}
                   </>
                 )}
               </section>
@@ -3984,6 +4221,7 @@ export default function App() {
 
           {view === 'categories' && (
             <section className="card pad cat-card">
+              <div className="cat-scroll-head">
               <div className="card-title-row">
                 <h1>Where it went</h1>
                 <span className="num muted">{fmt(pieTotal)}</span>
@@ -4011,6 +4249,9 @@ export default function App() {
                   <ChevronRight size={22} strokeWidth={2.25} aria-hidden="true" />
                 </button>
               </div>
+              </div>
+              <div className="scroll-shell">
+              <div className="cat-scroll-body" ref={setCatScrollEl}>
               {periodOffset === 0 && subsPending > 0 && (
                 <p className="card-note">
                   Plus <span className="num">{fmt(subsPending)}</span> in subscriptions, counted in the month total.
@@ -4130,6 +4371,9 @@ export default function App() {
                   {monthlyBudget > 0 && <p className="card-note">The dashed line is your monthly budget.</p>}
                 </div>
               )}
+              </div>
+              <ScrollRail target={catScrollEl} />
+              </div>
             </section>
           )}
 
@@ -4273,7 +4517,8 @@ export default function App() {
                       )}
                     </section>
 
-                    <div className="subs-table-wrap">
+                    <div className="scroll-shell">
+                    <div className="subs-table-wrap" ref={setSubsScrollEl} data-scroll-region>
                       <table className="subs-table">
                         <caption className="sr-only">
                           Subscriptions, sorted by {subSort.key === 'next' ? 'next billing date' : subSort.key}. Activate a column heading to change the sort.
@@ -4395,6 +4640,8 @@ export default function App() {
                           })}
                         </tbody>
                       </table>
+                    </div>
+                    <ScrollRail target={subsScrollEl} />
                     </div>
 
                     {editingSub && (
@@ -4598,6 +4845,8 @@ export default function App() {
                 {data.debts.length === 0 ? null : sortedLoans.length === 0 ? (
                   <p className="card-empty">No {loanFilter} loans.</p>
                 ) : (
+                  <div className="scroll-shell">
+                  <div className="loan-table-wrap" ref={setLoanScrollEl}>
                   <table className="loan-table">
                     <caption className="sr-only">Loans</caption>
                     <colgroup>
@@ -4763,7 +5012,23 @@ export default function App() {
                         );
                       })}
                     </tbody>
+                    <tfoot className="loan-foot">
+                      <tr>
+                        <th scope="row" colSpan={2} className="loan-foot-label">
+                          {sortedLoans.length} {sortedLoans.length === 1 ? 'loan' : 'loans'} shown
+                        </th>
+                        <td className="num loan-foot-sum">
+                          <span className={shownOwed > 0 ? 'neg' : ''}>{fmt(shownOwed)}</span>
+                        </td>
+                        <td colSpan={4} className="loan-foot-note">
+                          Owed to you <span className="num pos">{fmt(shownOwedToMe)}</span>
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
+                  </div>
+                  <ScrollRail target={loanScrollEl} />
+                  </div>
                 )}
               </section>
 
@@ -4812,7 +5077,8 @@ export default function App() {
           )}
 
           {view === 'accounts' && (
-            <section className="card pad accounts-card">
+            <div className="scroll-shell accounts-shell">
+            <section className="card pad accounts-card" ref={setAccountsScrollEl}>
               <div className="card-title-row">
                 <h1>Accounts</h1>
                 {!hasAccounts && <p className="card-empty">No accounts yet. Add one to start tracking balances.</p>}
@@ -5281,6 +5547,8 @@ export default function App() {
                 )}
               </div>
             </section>
+            <ScrollRail target={accountsScrollEl} />
+            </div>
           )}
 
           {isSettings && (
