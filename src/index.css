@@ -496,9 +496,7 @@ button[aria-busy='true']:disabled {
   flex-direction: column;
   min-height: clamp(232px, 64cqi, 340px);
   padding: 18px 20px 14px;
-  background:
-    radial-gradient(120% 80% at 20% 0%, rgb(246 241 228 / 0.055), rgb(246 241 228 / 0) 60%),
-    var(--ground-deep);
+  background: var(--ground-deep);
   overflow: hidden;
 }
 

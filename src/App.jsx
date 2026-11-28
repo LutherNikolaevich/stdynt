@@ -4801,7 +4801,7 @@ export default function App() {
               </section>
 
               <section className="card card--pad" id="categories-settings" aria-labelledby="cats-heading">
-                <h2 id="cats-heading">Expense categories</h2>
+                <h2 id="cats-heading">Categories</h2>
                 <div className="cat-head" aria-hidden="true">
                   <span>Ink</span>
                   <span>Name</span>
